@@ -1,4 +1,5 @@
 require('dotenv').config();
+import connectDB from "../db/db.js"
 
 const express = require('express');
 const cors = require('cors');
@@ -16,6 +17,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
+
+connectDB()
 
 async function initDB() {
   await pool.query(`
