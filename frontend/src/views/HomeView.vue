@@ -1,223 +1,163 @@
 <template>
   <ion-page>
     <ion-content :fullscreen="true" class="home-content">
-      <div class="bg-glow bg-glow-1"></div>
-      <div class="bg-glow bg-glow-2"></div>
+      <div class="grain"></div>
+      <div class="atm-glow"></div>
 
-      <div class="profile-header">
-        <div class="header-top">
-          <div class="logo-text"><span class="go">go</span><span class="together">Together</span></div>
-          <button class="btn-logout" @click="handleLogout">
-            <ion-icon :icon="logOutOutline" />
-          </button>
+      <div class="top-bar">
+        <div class="brand-name"><span class="go">go</span><span class="tog">Together</span></div>
+        <button class="icon-btn" @click="handleLogout"><ion-icon :icon="logOutOutline" /></button>
+      </div>
+
+      <div class="profile-hero">
+        <div class="avatar-wrap" @click="triggerPhotoUpload">
+          <img v-if="profilePhoto" :src="profilePhoto" class="avatar-img" />
+          <div v-else class="avatar">{{ userInitial }}</div>
+          <div class="avatar-badge"><ion-icon :icon="cameraOutline" /></div>
+          <input ref="photoInput" type="file" accept="image/*" style="display:none" @change="onPhotoChange" />
         </div>
-
-        <div class="profile-top">
-          <div class="avatar-wrap" @click="triggerPhotoUpload">
-            <img v-if="profilePhoto" :src="profilePhoto" class="avatar-img" />
-            <div v-else class="avatar-placeholder">{{ userInitial }}</div>
-            <div class="avatar-edit"><ion-icon :icon="cameraOutline" /></div>
-            <input ref="photoInput" type="file" accept="image/*" style="display:none" @change="onPhotoChange" />
-          </div>
-
-          <div class="profile-stats">
-            <div class="stat">
-              <span class="stat-num">0</span>
-              <span class="stat-label">Viajes</span>
-            </div>
-            <div v-if="isConductor" class="stat">
-              <span class="stat-num">{{ reviews.length + 1 }}</span>
-              <span class="stat-label">Reseñas</span>
-            </div>
-            <div v-if="isConductor" class="stat">
-              <span class="stat-num">{{ avgRating || '5.0' }}</span>
-              <span class="stat-label">Rating</span>
-            </div>
-            <div v-if="!isConductor" class="stat">
-              <span class="stat-num">{{ user?.university || '—' }}</span>
-              <span class="stat-label">Uni</span>
-            </div>
-          </div>
+        <div class="stats-row">
+          <div class="stat"><span class="stat-n">0</span><span class="stat-l">Viajes</span></div>
+          <div v-if="isConductor" class="stat"><span class="stat-n">{{ reviews.length }}</span><span class="stat-l">Reseñas</span></div>
+          <div v-if="isConductor && reviews.length > 0" class="stat"><span class="stat-n">{{ avgRating }}</span><span class="stat-l">Rating</span></div>
+          <div v-if="!isConductor" class="stat"><span class="stat-n">{{ user?.university || '—' }}</span><span class="stat-l">Uni</span></div>
         </div>
+      </div>
 
-        <div class="profile-info">
-          <div class="profile-name-row">
-            <h2 class="profile-name">{{ user?.name }}</h2>
-            <span class="role-badge" :class="user?.role">{{ isConductor ? '🚗 Conductor' : '🎒 Pasajero' }}</span>
-          </div>
-          <p class="profile-uni">{{ user?.city }}</p>
-
-          <div v-if="!editingBio" class="bio-wrap" @click="editingBio = true">
-            <p class="bio-text">{{ bio || '+ Agrega una descripción...' }}</p>
-            <ion-icon :icon="createOutline" class="edit-icon" />
-          </div>
-          <div v-else class="bio-edit">
-            <textarea v-model="bio" placeholder="Cuéntanos sobre ti..." rows="3" @blur="saveBio" />
-          </div>
+      <div class="profile-meta">
+        <div class="meta-name-row">
+          <span class="meta-name">{{ user?.name }}</span>
+          <span class="badge" :class="isConductor ? 'badge-red' : 'badge-gray'">
+            <ion-icon :icon="isConductor ? carOutline : personOutline" />
+            {{ isConductor ? 'Conductor' : 'Pasajero' }}
+          </span>
         </div>
-
-        <button class="btn-edit-profile">Editar perfil</button>
+        <div class="meta-city"><ion-icon :icon="locationOutline" />{{ user?.city || '—' }}</div>
+        <div v-if="!editingBio" class="bio-wrap" @click="editingBio = true">
+          <p class="bio-text">{{ bio || '+ Agrega una descripción...' }}</p>
+          <ion-icon :icon="createOutline" class="bio-edit-icon" />
+        </div>
+        <div v-else class="bio-edit">
+          <textarea v-model="bio" placeholder="Cuéntanos sobre ti..." rows="3" @blur="saveBio" />
+        </div>
+        <button class="edit-profile-btn">Editar perfil</button>
       </div>
 
       <div class="tabs">
-        <button v-for="tab in tabs" :key="tab.id" class="tab-btn"
-          :class="{ active: activeTab === tab.id }" @click="activeTab = tab.id">
+        <button v-for="tab in tabs" :key="tab.id" class="tab"
+          :class="{ on: activeTab === tab.id }" @click="activeTab = tab.id">
           <ion-icon :icon="tab.icon" />
           <span>{{ tab.label }}</span>
         </button>
       </div>
 
-      <!-- Tab: Info -->
+      <!-- Info -->
       <div v-if="activeTab === 'info'" class="tab-content">
-        <div class="section-card">
-          <h3 class="section-title">👤 Mis Datos</h3>
-          <div class="info-list">
-            <div class="info-row">
-              <ion-icon :icon="personOutline" class="info-icon" />
-              <div class="info-content">
-                <span class="info-label">Nombre</span>
-                <span class="info-value">{{ user?.name }}</span>
-              </div>
-            </div>
-            <div class="info-row">
-              <ion-icon :icon="mailOutline" class="info-icon" />
-              <div class="info-content">
-                <span class="info-label">Correo</span>
-                <span class="info-value">{{ user?.email }}</span>
-              </div>
-            </div>
-            <div class="info-row">
-              <ion-icon :icon="schoolOutline" class="info-icon" />
-              <div class="info-content">
-                <span class="info-label">Universidad</span>
-                <span class="info-value">{{ user?.university || user?.route || '—' }}</span>
-              </div>
-            </div>
-            <div class="info-row">
-              <ion-icon :icon="locationOutline" class="info-icon" />
-              <div class="info-content">
-                <span class="info-label">Ciudad</span>
-                <span class="info-value">{{ user?.city || '—' }}</span>
-              </div>
-            </div>
-            <template v-if="isConductor">
-              <div class="info-row">
-                <ion-icon :icon="carOutline" class="info-icon" />
-                <div class="info-content">
-                  <span class="info-label">Vehículo</span>
-                  <span class="info-value">{{ user?.car_model || '—' }}</span>
-                </div>
-              </div>
-              <div class="info-row">
-                <ion-icon :icon="cardOutline" class="info-icon" />
-                <div class="info-content">
-                  <span class="info-label">Placa</span>
-                  <span class="info-value">{{ user?.plate || '—' }}</span>
-                </div>
-              </div>
-              <div class="info-row">
-                <span class="info-icon vehicle-emoji">{{ user?.vehicle_type === 'moto' ? '🏍️' : '🚗' }}</span>
-                <div class="info-content">
-                  <span class="info-label">Tipo de vehículo</span>
-                  <span class="info-value">{{ user?.vehicle_type === 'moto' ? 'Moto' : 'Carro' }}</span>
-                </div>
-              </div>
-              <div class="info-row">
-                <ion-icon :icon="peopleOutline" class="info-icon" />
-                <div class="info-content">
-                  <span class="info-label">Capacidad</span>
-                  <span class="info-value">{{ user?.capacity || '—' }} pasajeros</span>
-                </div>
-              </div>
-            </template>
+        <div class="info-card">
+          <div class="info-row">
+            <div class="info-icon-wrap"><ion-icon :icon="personOutline" /></div>
+            <div class="info-col"><span class="info-lbl">Nombre</span><span class="info-val">{{ user?.name }}</span></div>
           </div>
+          <div class="info-row">
+            <div class="info-icon-wrap"><ion-icon :icon="mailOutline" /></div>
+            <div class="info-col"><span class="info-lbl">Correo</span><span class="info-val">{{ user?.email }}</span></div>
+          </div>
+          <div v-if="!isConductor" class="info-row">
+            <div class="info-icon-wrap"><ion-icon :icon="schoolOutline" /></div>
+            <div class="info-col"><span class="info-lbl">Universidad</span><span class="info-val">{{ user?.university || '—' }}</span></div>
+          </div>
+          <div class="info-row">
+            <div class="info-icon-wrap"><ion-icon :icon="locationOutline" /></div>
+            <div class="info-col"><span class="info-lbl">Ciudad</span><span class="info-val">{{ user?.city || '—' }}</span></div>
+          </div>
+          <template v-if="isConductor">
+            <div class="info-row">
+              <div class="info-icon-wrap"><ion-icon :icon="carOutline" /></div>
+              <div class="info-col"><span class="info-lbl">Vehículo</span><span class="info-val">{{ user?.car_model || '—' }}</span></div>
+            </div>
+            <div class="info-row">
+              <div class="info-icon-wrap"><ion-icon :icon="cardOutline" /></div>
+              <div class="info-col"><span class="info-lbl">Placa</span><span class="info-val">{{ user?.plate || '—' }}</span></div>
+            </div>
+            <div class="info-row">
+              <div class="info-icon-wrap"><ion-icon :icon="speedometerOutline" /></div>
+              <div class="info-col"><span class="info-lbl">Tipo</span><span class="info-val">{{ user?.vehicle_type === 'moto' ? 'Moto' : 'Carro' }}</span></div>
+            </div>
+          </template>
         </div>
       </div>
 
-      <!-- Tab: Horarios -->
+      <!-- Horarios -->
       <div v-if="activeTab === 'schedule'" class="tab-content">
-        <div class="section-card">
-          <h3 class="section-title">🕐 Mis Horarios</h3>
-          <div class="schedule-grid">
-            <div class="schedule-item">
-              <div class="schedule-icon purple"><ion-icon :icon="arrowForwardOutline" /></div>
-              <div class="schedule-info">
-                <span class="schedule-label">Ida</span>
-                <input v-model="schedule.ida" type="text" placeholder="Ej: 6:30 AM" class="schedule-input" @blur="saveSchedule" />
-              </div>
+        <div v-for="dia in dias" :key="dia.key" class="day-card">
+          <button class="day-card-header" @click="toggleDia('schedule', dia.key)">
+            <span class="day-name">{{ dia.label }}</span>
+            <div class="day-chips">
+              <span v-if="schedule[dia.key].ida" class="day-chip">↑ {{ schedule[dia.key].ida }}</span>
+              <span v-if="schedule[dia.key].vuelta" class="day-chip">↓ {{ schedule[dia.key].vuelta }}</span>
             </div>
-            <div class="schedule-item">
-              <div class="schedule-icon blue"><ion-icon :icon="arrowBackOutline" /></div>
-              <div class="schedule-info">
-                <span class="schedule-label">Vuelta</span>
-                <input v-model="schedule.vuelta" type="text" placeholder="Ej: 5:00 PM" class="schedule-input" @blur="saveSchedule" />
-              </div>
-            </div>
-          </div>
-          <button class="btn-save-small" @click="saveSchedule">
-            <ion-icon :icon="checkmarkOutline" /> Guardar horarios
+            <ion-icon :icon="openDias.schedule[dia.key] ? chevronUpOutline : chevronDownOutline" class="day-chevron" />
           </button>
+          <div v-if="openDias.schedule[dia.key]" class="day-card-body">
+            <div class="day-field-row">
+              <div class="day-field">
+                <span class="day-field-label">Ida</span>
+                <input v-model="schedule[dia.key].ida" type="text" placeholder="6:30 AM" class="schedule-day-input" @input="saveSchedule" />
+              </div>
+              <div class="day-field">
+                <span class="day-field-label">Vuelta</span>
+                <input v-model="schedule[dia.key].vuelta" type="text" placeholder="5:00 PM" class="schedule-day-input" @input="saveSchedule" />
+              </div>
+            </div>
+            <button class="btn-save-sm" @click="saveSchedule"><ion-icon :icon="checkmarkOutline" /> Guardar</button>
+          </div>
         </div>
       </div>
 
-      <!-- Tab: Ruta (solo conductor) -->
+      <!-- Ruta -->
       <div v-if="activeTab === 'route'" class="tab-content">
-        <div class="section-card">
-          <h3 class="section-title">🗺️ Mi Ruta</h3>
-          <div class="vehicle-card">
-            <div class="vehicle-icon">{{ user?.vehicle_type === 'moto' ? '🏍️' : '🚗' }}</div>
-            <div class="vehicle-info">
-              <span class="vehicle-model">{{ user?.car_model || 'Vehículo no registrado' }}</span>
-              <span class="vehicle-plate">{{ user?.plate || '— — —' }} · {{ user?.capacity || '?' }} puestos</span>
-            </div>
+        <div class="vehicle-card">
+          <div class="vehicle-icon-wrap"><ion-icon :icon="carOutline" /></div>
+          <div class="vehicle-info">
+            <span class="vehicle-model">{{ user?.car_model || 'Vehículo no registrado' }}</span>
+            <span class="vehicle-sub">{{ user?.plate || '— — —' }}</span>
           </div>
-          <div class="stops-section">
-            <div class="stops-header">
-              <span class="stops-title">Paradas</span>
-              <button class="btn-add-stop" @click="addStop">
-                <ion-icon :icon="addOutline" /> Agregar parada
-              </button>
+        </div>
+        <div v-for="dia in dias" :key="dia.key" class="day-card">
+          <button class="day-card-header" @click="toggleDia('route', dia.key)">
+            <span class="day-name">{{ dia.label }}</span>
+            <div class="day-chips">
+              <span v-if="routes[dia.key].stops.filter((s:string) => s).length > 0" class="day-chip">
+                {{ routes[dia.key].stops.filter((s:string) => s).length }} paradas
+              </span>
             </div>
+            <ion-icon :icon="openDias.route[dia.key] ? chevronUpOutline : chevronDownOutline" class="day-chevron" />
+          </button>
+          <div v-if="openDias.route[dia.key]" class="day-card-body">
             <div class="stops-list">
-              <div v-for="(stop, i) in stops" :key="i" class="stop-item">
-                <div class="stop-dot" :class="i === 0 ? 'start' : i === stops.length - 1 ? 'end' : 'mid'"></div>
-                <div class="stop-content">
-                  <input v-model="stops[i]" type="text"
-                    :placeholder="i === 0 ? 'Punto de partida' : i === stops.length - 1 ? 'Destino final' : `Parada ${i}`"
-                    class="stop-input" />
-                  <button v-if="stops.length > 2" class="btn-remove-stop" @click="removeStop(i)">
-                    <ion-icon :icon="closeOutline" />
-                  </button>
-                </div>
+              <div v-for="(stop, i) in routes[dia.key].stops" :key="i" class="stop-row">
+                <div class="stop-dot" :class="i === 0 ? 'start' : i === routes[dia.key].stops.length - 1 ? 'end' : 'mid'"></div>
+                <input v-model="routes[dia.key].stops[i]" type="text"
+                  :placeholder="i === 0 ? 'Punto de partida' : i === routes[dia.key].stops.length - 1 ? 'Destino final' : `Parada ${i}`"
+                  class="stop-input" />
+                <button v-if="routes[dia.key].stops.length > 2" class="btn-remove" @click="removeStop(dia.key, Number(i))">
+                  <ion-icon :icon="closeOutline" />
+                </button>
               </div>
             </div>
-            <button class="btn-save-small" @click="saveRoute">
-              <ion-icon :icon="checkmarkOutline" /> Guardar ruta
-            </button>
+            <div class="day-actions">
+              <button class="btn-add" @click="addStop(dia.key)"><ion-icon :icon="addOutline" /> Parada</button>
+              <button class="btn-save-sm" @click="saveRoutes"><ion-icon :icon="checkmarkOutline" /> Guardar</button>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Tab: Reseñas (solo conductor) -->
+      <!-- Reseñas -->
       <div v-if="activeTab === 'reviews'" class="tab-content">
-        <div class="section-card">
-          <h3 class="section-title">⭐ Reseñas</h3>
-          <div class="review-card demo">
-            <div class="review-header">
-              <div class="review-avatar">C</div>
-              <div class="review-meta">
-                <span class="review-name">Carlos M.</span>
-                <div class="review-stars">
-                  <ion-icon v-for="s in 5" :key="s" :icon="star" class="star filled" />
-                </div>
-              </div>
-            </div>
-            <p class="review-text">Excelente conductor, muy puntual y amable. 100% recomendado!</p>
-          </div>
-          <div v-if="reviews.length === 0" class="empty-state">
-            <ion-icon :icon="starOutline" class="empty-icon" />
-            <p>Aún no tienes más reseñas</p>
-          </div>
+        <div v-if="reviews.length === 0" class="empty-state">
+          <ion-icon :icon="starOutline" class="empty-icon" />
+          <p>Aún no tienes reseñas</p>
         </div>
       </div>
 
@@ -226,14 +166,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonIcon } from '@ionic/vue';
 import {
   logOutOutline, cameraOutline, createOutline, checkmarkOutline,
-  arrowForwardOutline, arrowBackOutline, addOutline, closeOutline,
-  starOutline, star, carOutline, personOutline, mailOutline,
-  schoolOutline, locationOutline, cardOutline, timeOutline, mapOutline, peopleOutline,
+  addOutline, closeOutline, starOutline, carOutline, personOutline,
+  mailOutline, schoolOutline, locationOutline, cardOutline, timeOutline,
+  mapOutline, speedometerOutline, chevronUpOutline, chevronDownOutline,
 } from 'ionicons/icons';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -243,7 +183,10 @@ const user = computed(() => authStore.user);
 const isConductor = computed(() => user.value?.role === 'conductor');
 const userInitial = computed(() => user.value?.name?.charAt(0).toUpperCase() || '?');
 
-const profilePhoto = ref<string | null>(localStorage.getItem('profilePhoto'));
+// Clave única por usuario
+const k = (key: string) => `user_${user.value?.id || 'guest'}_${key}`;
+
+const profilePhoto = ref<string | null>(localStorage.getItem(k('profilePhoto')));
 const photoInput = ref<HTMLInputElement | null>(null);
 function triggerPhotoUpload() { photoInput.value?.click(); }
 function onPhotoChange(e: Event) {
@@ -252,25 +195,49 @@ function onPhotoChange(e: Event) {
   const reader = new FileReader();
   reader.onload = (ev) => {
     profilePhoto.value = ev.target?.result as string;
-    localStorage.setItem('profilePhoto', profilePhoto.value);
+    localStorage.setItem(k('profilePhoto'), profilePhoto.value);
   };
   reader.readAsDataURL(file);
 }
 
-const bio = ref(localStorage.getItem('bio') || '');
+const bio = ref(localStorage.getItem(k('bio')) || '');
 const editingBio = ref(false);
-function saveBio() {
-  editingBio.value = false;
-  localStorage.setItem('bio', bio.value);
+function saveBio() { editingBio.value = false; localStorage.setItem(k('bio'), bio.value); }
+
+const dias = [
+  { key: 'lunes', label: 'Lunes' },
+  { key: 'martes', label: 'Martes' },
+  { key: 'miercoles', label: 'Miércoles' },
+  { key: 'jueves', label: 'Jueves' },
+  { key: 'viernes', label: 'Viernes' },
+  { key: 'sabado', label: 'Sábado' },
+];
+
+const defaultSchedule = () => Object.fromEntries(dias.map(d => [d.key, { ida: '', vuelta: '' }]));
+const schedule = ref(JSON.parse(localStorage.getItem(k('schedule')) || 'null') || defaultSchedule());
+function saveSchedule() { localStorage.setItem(k('schedule'), JSON.stringify(schedule.value)); }
+
+const defaultRoutes = () => Object.fromEntries(dias.map(d => [d.key, { stops: ['', ''] }]));
+const routes = ref(JSON.parse(localStorage.getItem(k('routes')) || 'null') || defaultRoutes());
+function addStop(diaKey: string) { routes.value[diaKey].stops.splice(routes.value[diaKey].stops.length - 1, 0, ''); }
+function removeStop(diaKey: string, i: number) { routes.value[diaKey].stops.splice(i, 1); }
+function saveRoutes() { localStorage.setItem(k('routes'), JSON.stringify(routes.value)); }
+
+// Recargar datos si el usuario cambia
+watch(user, () => {
+  profilePhoto.value = localStorage.getItem(k('profilePhoto'));
+  bio.value = localStorage.getItem(k('bio')) || '';
+  schedule.value = JSON.parse(localStorage.getItem(k('schedule')) || 'null') || defaultSchedule();
+  routes.value = JSON.parse(localStorage.getItem(k('routes')) || 'null') || defaultRoutes();
+});
+
+const openDias = reactive({
+  schedule: Object.fromEntries(dias.map(d => [d.key, false])),
+  route: Object.fromEntries(dias.map(d => [d.key, false])),
+});
+function toggleDia(tab: string, key: string) {
+  (openDias as any)[tab][key] = !(openDias as any)[tab][key];
 }
-
-const schedule = ref(JSON.parse(localStorage.getItem('schedule') || '{"ida":"","vuelta":""}'));
-function saveSchedule() { localStorage.setItem('schedule', JSON.stringify(schedule.value)); }
-
-const stops = ref<string[]>(JSON.parse(localStorage.getItem('stops') || '["",""]'));
-function addStop() { stops.value.splice(stops.value.length - 1, 0, ''); }
-function removeStop(i: number) { stops.value.splice(i, 1); }
-function saveRoute() { localStorage.setItem('stops', JSON.stringify(stops.value)); }
 
 const reviews = ref<{name: string; rating: number; comment: string}[]>([]);
 const avgRating = computed(() => {
@@ -291,96 +258,97 @@ const tabs = computed(() => {
 });
 const activeTab = ref('info');
 
-function handleLogout() {
-  authStore.logout();
-  router.replace('/welcome');
-}
+function handleLogout() { authStore.logout(); router.replace('/welcome'); }
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800;900&display=swap');
-.home-content { --background: #0d0820; font-family: 'Exo 2', sans-serif; }
-.bg-glow { position: fixed; border-radius: 50%; filter: blur(90px); pointer-events: none; z-index: 0; }
-.bg-glow-1 { width: 300px; height: 300px; background: radial-gradient(circle, rgba(200,80,192,0.2), transparent 70%); top: -60px; right: -40px; }
-.bg-glow-2 { width: 250px; height: 250px; background: radial-gradient(circle, rgba(65,88,208,0.2), transparent 70%); bottom: 100px; left: -40px; }
-.profile-header { position: relative; z-index: 1; padding: 16px 20px 0; }
-.header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.logo-text { font-size: 20px; font-weight: 800; }
-.go { color: #fff; }
-.together { background: linear-gradient(90deg, #c850c0, #4158d0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-.btn-logout { background: rgba(255,255,255,0.07); border: none; border-radius: 10px; width: 36px; height: 36px; color: rgba(255,255,255,0.5); font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.profile-top { display: flex; align-items: center; gap: 24px; margin-bottom: 16px; }
-.avatar-wrap { position: relative; width: 80px; height: 80px; flex-shrink: 0; cursor: pointer; }
-.avatar-img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #c850c0; }
-.avatar-placeholder { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #c850c0, #4158d0); display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800; color: #fff; border: 3px solid rgba(200,80,192,0.5); }
-.avatar-edit { position: absolute; bottom: 0; right: 0; width: 24px; height: 24px; background: #c850c0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; border: 2px solid #0d0820; }
-.profile-stats { display: flex; gap: 20px; flex: 1; justify-content: center; }
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+.home-content { --background: #070707; font-family: 'DM Sans', sans-serif; }
+.grain { position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; }
+.atm-glow { position: fixed; width: 300px; height: 300px; background: radial-gradient(circle, rgba(139,26,26,0.14) 0%, transparent 70%); top: -80px; left: 50%; transform: translateX(-50%); filter: blur(50px); pointer-events: none; z-index: 0; }
+
+.top-bar { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: center; padding: 18px 22px 0; }
+.brand-name { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+.go { color: #ede9e6; } .tog { color: #a32020; }
+.icon-btn { width: 34px; height: 34px; background: #171717; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: rgba(237,233,230,0.45); font-size: 17px; cursor: pointer; }
+
+.profile-hero { position: relative; z-index: 1; padding: 20px 22px 16px; display: flex; align-items: center; gap: 22px; }
+.avatar-wrap { position: relative; flex-shrink: 0; cursor: pointer; }
+.avatar-img { width: 68px; height: 68px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(139,26,26,0.4); }
+.avatar { width: 68px; height: 68px; border-radius: 50%; background: linear-gradient(135deg, #8B1A1A 0%, #4a0e0e 100%); display: flex; align-items: center; justify-content: center; font-family: 'Outfit', sans-serif; font-size: 26px; font-weight: 800; color: #ede9e6; box-shadow: 0 0 28px rgba(139,26,26,0.3); }
+.avatar-badge { position: absolute; bottom: -2px; right: -2px; width: 22px; height: 22px; background: #171717; border: 1.5px solid rgba(255,255,255,0.12); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; color: rgba(237,233,230,0.5); }
+.stats-row { display: flex; gap: 20px; }
 .stat { display: flex; flex-direction: column; align-items: center; }
-.stat-num { color: #fff; font-size: 16px; font-weight: 800; }
-.stat-label { color: rgba(255,255,255,0.4); font-size: 11px; }
-.profile-info { margin-bottom: 14px; }
-.profile-name-row { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
-.profile-name { color: #fff; font-size: 17px; font-weight: 700; margin: 0; }
-.role-badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px; }
-.role-badge.conductor { background: rgba(200,80,192,0.2); color: #c850c0; border: 1px solid rgba(200,80,192,0.3); }
-.role-badge.pasajero { background: rgba(65,88,208,0.2); color: #6a7de8; border: 1px solid rgba(65,88,208,0.3); }
-.profile-uni { color: rgba(255,255,255,0.45); font-size: 13px; margin: 0 0 10px; }
-.bio-wrap { display: flex; align-items: flex-start; gap: 6px; cursor: pointer; }
-.bio-text { color: rgba(255,255,255,0.7); font-size: 13px; margin: 0; line-height: 1.5; flex: 1; }
-.edit-icon { color: rgba(255,255,255,0.25); font-size: 14px; flex-shrink: 0; margin-top: 2px; }
-.bio-edit textarea { width: 100%; background: rgba(255,255,255,0.07); border: 1.5px solid rgba(200,80,192,0.4); border-radius: 10px; color: #fff; font-family: 'Exo 2', sans-serif; font-size: 13px; padding: 10px 12px; resize: none; outline: none; box-sizing: border-box; }
-.btn-edit-profile { width: 100%; padding: 9px; background: transparent; border: 1.5px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-family: 'Exo 2', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 4px; }
-.tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); position: relative; z-index: 1; margin-top: 8px; }
-.tab-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; background: transparent; border: none; color: rgba(255,255,255,0.35); font-family: 'Exo 2', sans-serif; font-size: 10px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s; }
-.tab-btn ion-icon { font-size: 18px; }
-.tab-btn.active { color: #c850c0; border-bottom-color: #c850c0; }
-.tab-content { position: relative; z-index: 1; padding: 16px 20px 40px; }
-.section-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 18px; }
-.section-title { color: #fff; font-size: 15px; font-weight: 700; margin: 0 0 16px; }
-.info-list { display: flex; flex-direction: column; }
-.info-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.stat-n { font-family: 'Outfit', sans-serif; font-size: 17px; font-weight: 800; color: #ede9e6; }
+.stat-l { color: rgba(237,233,230,0.3); font-size: 9px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+
+.profile-meta { position: relative; z-index: 1; padding: 0 22px 16px; }
+.meta-name-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+.meta-name { font-family: 'Outfit', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: -0.3px; color: #ede9e6; }
+.badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 20px; padding: 3px 10px; font-size: 10px; font-weight: 600; font-family: 'DM Sans', sans-serif; }
+.badge ion-icon { font-size: 10px; }
+.badge-red { background: rgba(139,26,26,0.14); border: 1px solid rgba(139,26,26,0.28); color: #a32020; }
+.badge-gray { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: rgba(237,233,230,0.6); }
+.meta-city { color: rgba(237,233,230,0.35); font-size: 12px; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+.meta-city ion-icon { font-size: 12px; }
+.bio-wrap { display: flex; align-items: flex-start; gap: 6px; cursor: pointer; margin-bottom: 12px; }
+.bio-text { color: rgba(237,233,230,0.5); font-size: 13px; line-height: 1.55; flex: 1; }
+.bio-edit-icon { color: rgba(237,233,230,0.2); font-size: 13px; flex-shrink: 0; margin-top: 2px; }
+.bio-edit textarea { width: 100%; background: #171717; border: 1px solid rgba(139,26,26,0.3); border-radius: 12px; color: #ede9e6; font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 12px 14px; resize: none; outline: none; box-sizing: border-box; margin-bottom: 12px; }
+.edit-profile-btn { width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #ede9e6; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+.tabs { position: relative; z-index: 1; display: flex; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.tab { flex: 1; padding: 11px 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; color: rgba(237,233,230,0.25); font-size: 9px; font-weight: 600; font-family: 'DM Sans', sans-serif; letter-spacing: 0.8px; text-transform: uppercase; border: none; background: transparent; border-bottom: 2px solid transparent; cursor: pointer; transition: color 0.2s, border-color 0.2s; }
+.tab ion-icon { font-size: 16px; }
+.tab.on { color: #a32020; border-bottom-color: #8B1A1A; }
+
+.tab-content { position: relative; z-index: 1; padding: 16px 20px 48px; display: flex; flex-direction: column; gap: 8px; }
+
+.info-card { background: #111111; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; overflow: hidden; }
+.info-row { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); }
 .info-row:last-child { border-bottom: none; }
-.info-icon { color: #c850c0; font-size: 18px; flex-shrink: 0; }
-.vehicle-emoji { font-size: 18px; }
-.info-content { display: flex; flex-direction: column; }
-.info-label { color: rgba(255,255,255,0.35); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-.info-value { color: #fff; font-size: 14px; font-weight: 500; }
-.schedule-grid { display: flex; gap: 12px; margin-bottom: 14px; }
-.schedule-item { flex: 1; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 14px; display: flex; align-items: center; gap: 10px; }
-.schedule-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #fff; flex-shrink: 0; }
-.schedule-icon.purple { background: linear-gradient(135deg, #c850c0, #8b31b0); }
-.schedule-icon.blue { background: linear-gradient(135deg, #4158d0, #2d3db0); }
-.schedule-info { display: flex; flex-direction: column; flex: 1; }
-.schedule-label { color: rgba(255,255,255,0.4); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-.schedule-input { background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.15); outline: none; color: #fff; font-family: 'Exo 2', sans-serif; font-size: 15px; font-weight: 700; width: 100%; padding: 4px 0; }
-.vehicle-card { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
-.vehicle-icon { font-size: 32px; }
+.info-icon-wrap { width: 30px; height: 30px; background: #1a1a1a; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; color: #a32020; flex-shrink: 0; }
+.info-col { display: flex; flex-direction: column; }
+.info-lbl { color: rgba(237,233,230,0.28); font-size: 9px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; }
+.info-val { color: #ede9e6; font-size: 13px; font-weight: 500; margin-top: 1px; }
+
+/* Day cards */
+.day-card { background: #111111; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; overflow: hidden; }
+.day-card-header { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: transparent; border: none; cursor: pointer; }
+.day-name { font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; color: #ede9e6; min-width: 72px; text-align: left; }
+.day-chips { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
+.day-chip { background: rgba(139,26,26,0.15); border: 1px solid rgba(139,26,26,0.25); border-radius: 6px; color: #a32020; font-size: 10px; font-weight: 600; padding: 2px 8px; font-family: 'DM Sans', sans-serif; }
+.day-chevron { color: rgba(237,233,230,0.25); font-size: 16px; flex-shrink: 0; }
+.day-card-body { padding: 0 16px 14px; border-top: 1px solid rgba(255,255,255,0.04); }
+.day-field-row { display: flex; gap: 10px; margin-top: 12px; }
+.day-field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.day-field-label { color: rgba(237,233,230,0.28); font-size: 9px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+.schedule-day-input { background: #1a1a1a; border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; color: #ede9e6; font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 9px 12px; outline: none; width: 100%; }
+.schedule-day-input::placeholder { color: rgba(237,233,230,0.18); font-size: 11px; }
+
+/* Vehicle */
+.vehicle-card { display: flex; align-items: center; gap: 14px; background: #111111; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 16px; }
+.vehicle-icon-wrap { width: 44px; height: 44px; background: rgba(139,26,26,0.12); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #a32020; flex-shrink: 0; }
 .vehicle-info { display: flex; flex-direction: column; }
-.vehicle-model { color: #fff; font-size: 15px; font-weight: 700; }
-.vehicle-plate { color: rgba(255,255,255,0.4); font-size: 12px; }
-.stops-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.stops-title { color: rgba(255,255,255,0.7); font-size: 13px; font-weight: 600; }
-.btn-add-stop { background: rgba(200,80,192,0.15); border: 1px solid rgba(200,80,192,0.3); border-radius: 8px; color: #c850c0; font-family: 'Exo 2', sans-serif; font-size: 12px; font-weight: 600; padding: 6px 12px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-.stops-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-.stop-item { display: flex; align-items: center; gap: 12px; }
-.stop-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-.stop-dot.start { background: #c850c0; box-shadow: 0 0 8px rgba(200,80,192,0.6); }
-.stop-dot.mid { background: rgba(255,255,255,0.3); border: 2px solid rgba(255,255,255,0.2); }
-.stop-dot.end { background: #4158d0; box-shadow: 0 0 8px rgba(65,88,208,0.6); }
-.stop-content { flex: 1; display: flex; align-items: center; gap: 8px; }
-.stop-input { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-family: 'Exo 2', sans-serif; font-size: 13px; padding: 10px 12px; outline: none; }
-.stop-input::placeholder { color: rgba(255,255,255,0.2); }
-.btn-remove-stop { background: rgba(255,80,80,0.1); border: none; border-radius: 6px; color: #ff7070; font-size: 16px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
-.empty-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px 0; color: rgba(255,255,255,0.3); }
-.empty-icon { font-size: 36px; }
-.review-card { background: rgba(255,255,255,0.04); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
-.review-card.demo { border: 1px solid rgba(255,255,255,0.08); }
-.review-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.review-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #4158d0, #c850c0); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #fff; flex-shrink: 0; }
-.review-name { color: #fff; font-size: 13px; font-weight: 700; }
-.review-stars { display: flex; gap: 2px; }
-.star { font-size: 12px; color: rgba(255,255,255,0.2); }
-.star.filled { color: #f5c518; }
-.review-text { color: rgba(255,255,255,0.6); font-size: 13px; margin: 0; line-height: 1.5; }
-.btn-save-small { display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #c850c0, #8b31b0); border: none; border-radius: 10px; color: #fff; font-family: 'Exo 2', sans-serif; font-size: 13px; font-weight: 600; padding: 10px 16px; cursor: pointer; margin-top: 4px; }
+.vehicle-model { color: #ede9e6; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; }
+.vehicle-sub { color: rgba(237,233,230,0.35); font-size: 11px; margin-top: 2px; }
+
+/* Stops */
+.stops-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.stop-row { display: flex; align-items: center; gap: 10px; }
+.stop-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.stop-dot.start { background: #8B1A1A; box-shadow: 0 0 8px rgba(139,26,26,0.5); }
+.stop-dot.mid { background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.15); }
+.stop-dot.end { background: rgba(237,233,230,0.5); }
+.stop-input { flex: 1; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; color: #ede9e6; font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 9px 12px; outline: none; }
+.stop-input::placeholder { color: rgba(237,233,230,0.18); }
+.btn-remove { background: rgba(255,60,60,0.08); border: none; border-radius: 6px; color: rgba(255,100,100,0.6); font-size: 15px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+
+.day-actions { display: flex; gap: 8px; margin-top: 10px; }
+.btn-add { background: rgba(139,26,26,0.12); border: 1px solid rgba(139,26,26,0.25); border-radius: 8px; color: #a32020; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; padding: 7px 12px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.btn-save-sm { display: flex; align-items: center; gap: 5px; background: #8B1A1A; border: none; border-radius: 8px; color: #ede9e6; font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600; padding: 7px 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(139,26,26,0.3); }
+
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 0; color: rgba(237,233,230,0.25); }
+.empty-icon { font-size: 32px; }
 </style>

@@ -1,50 +1,46 @@
 <template>
   <ion-page>
     <ion-content :fullscreen="true" class="login-content">
-      <div class="bg-glow"></div>
-      <div class="login-wrapper">
+      <div class="grain"></div>
+      <div class="atm-glow"></div>
 
-        <button class="back-btn" @click="router.back()">
-          <ion-icon :icon="chevronBackOutline" />
-        </button>
-
-        <div class="logo-mini">
-          <span class="brand-go">go</span><span class="brand-together">Together</span>
-        </div>
-
-        <h1 class="page-title">Inicio de sesión</h1>
-
-        <div class="form-card">
-          <div class="field-group">
-            <div class="input-wrap" :class="{ focused: focused === 'email' }">
-              <ion-icon :icon="mailOutline" class="input-icon" />
-              <input v-model="email" type="email" placeholder="Correo"
-                @focus="focused = 'email'" @blur="focused = ''" />
-            </div>
-          </div>
-
-          <div class="field-group">
-            <div class="input-wrap" :class="{ focused: focused === 'password' }">
-              <ion-icon :icon="lockClosedOutline" class="input-icon" />
-              <input v-model="password" :type="showPass ? 'text' : 'password'" placeholder="Contraseña"
-                @focus="focused = 'password'" @blur="focused = ''" />
-              <ion-icon :icon="showPass ? eyeOffOutline : eyeOutline" class="input-icon-right" @click="showPass = !showPass" />
-            </div>
-          </div>
-
-          <div v-if="error" class="error-msg">
-            <ion-icon :icon="alertCircleOutline" /> {{ error }}
-          </div>
-
-          <button class="btn-submit" :disabled="loading" @click="handleLogin">
-            <ion-spinner v-if="loading" name="crescent" />
-            <span v-else>Ingresar como {{ role === 'pasajero' ? 'Usuario' : 'Conductor' }}</span>
+      <div class="screen">
+        <div class="back-row">
+          <button class="back-btn" @click="router.back()">
+            <ion-icon :icon="arrowBackOutline" />
           </button>
-
-          <p class="forgot" @click="">Olvide mi contraseña</p>
         </div>
 
+        <div class="login-title">Bienvenido<br>de vuelta</div>
+        <div class="login-sub">Inicia sesión para continuar</div>
+
+        <div class="field">
+          <label class="field-label">Correo electrónico</label>
+          <div class="input-row">
+            <ion-icon :icon="mailOutline" class="input-icon" />
+            <input v-model="email" type="email" placeholder="correo@universidad.edu.co" class="input-real" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Contraseña</label>
+          <div class="input-row">
+            <ion-icon :icon="lockClosedOutline" class="input-icon" />
+            <input v-model="password" type="password" placeholder="••••••••" class="input-real" />
+          </div>
+        </div>
+
+        <p v-if="error" class="error-msg">{{ error }}</p>
+
+        <div class="login-actions">
+          <button class="btn-fill" @click="handleLogin" :disabled="loading">
+            <span>{{ loading ? 'Ingresando...' : 'Iniciar sesión' }}</span>
+            <ion-icon v-if="!loading" :icon="arrowForwardOutline" />
+          </button>
+          <div class="forgot">¿Olvidaste tu contraseña?</div>
+        </div>
       </div>
+
     </ion-content>
   </ion-page>
 </template>
@@ -52,33 +48,27 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { IonPage, IonContent, IonIcon, IonSpinner } from '@ionic/vue';
-import { chevronBackOutline, mailOutline, lockClosedOutline, eyeOutline, eyeOffOutline, alertCircleOutline } from 'ionicons/icons';
-import { authService } from '@/services/authService';
+import { IonPage, IonContent, IonIcon } from '@ionic/vue';
+import { arrowBackOutline, mailOutline, lockClosedOutline, arrowForwardOutline } from 'ionicons/icons';
+import { useAuthStore } from '@/stores/authStore';
 
 const router = useRouter();
 const route = useRoute();
-const role = route.params.role as string;
+const authStore = useAuthStore();
 
 const email = ref('');
 const password = ref('');
-const showPass = ref(false);
-const focused = ref('');
-const loading = ref(false);
 const error = ref('');
+const loading = ref(false);
 
 async function handleLogin() {
-  if (!email.value || !password.value) {
-    error.value = 'Completa todos los campos';
-    return;
-  }
-  loading.value = true;
   error.value = '';
+  loading.value = true;
   try {
-    await authService.login(email.value, password.value);
+    await authStore.login(email.value, password.value);
     router.replace('/home');
   } catch (e: any) {
-    error.value = e?.response?.data?.message || 'Credenciales inválidas';
+    error.value = e.message || 'Error al iniciar sesión';
   } finally {
     loading.value = false;
   }
@@ -86,25 +76,104 @@ async function handleLogin() {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800;900&display=swap');
-.login-content { --background: #12082a; font-family: 'Exo 2', sans-serif; }
-.bg-glow { position: fixed; width: 350px; height: 350px; background: radial-gradient(circle, rgba(200,80,192,0.25), transparent 70%); filter: blur(80px); top: -80px; right: -60px; pointer-events: none; z-index: 0; }
-.login-wrapper { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 24px; }
-.back-btn { background: rgba(255,255,255,0.07); border: none; border-radius: 10px; width: 38px; height: 38px; color: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; align-self: flex-start; margin-bottom: 32px; }
-.logo-mini { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
-.brand-go { color: #fff; }
-.brand-together { background: linear-gradient(90deg, #c850c0, #4158d0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-.page-title { color: #fff; font-size: 24px; font-weight: 700; margin: 0 0 32px; }
-.form-card { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 14px; }
-.input-wrap { display: flex; align-items: center; background: rgba(255,255,255,0.07); border: 1.5px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 0 14px; transition: border-color 0.2s, box-shadow 0.2s; }
-.input-wrap.focused { border-color: #c850c0; box-shadow: 0 0 0 3px rgba(200,80,192,0.18); }
-.input-icon { color: rgba(255,255,255,0.35); font-size: 18px; flex-shrink: 0; }
-.input-icon-right { color: rgba(255,255,255,0.35); font-size: 18px; flex-shrink: 0; cursor: pointer; }
-.input-wrap input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-family: 'Exo 2', sans-serif; font-size: 15px; padding: 14px 10px; }
-.input-wrap input::placeholder { color: rgba(255,255,255,0.25); }
-.error-msg { display: flex; align-items: center; gap: 8px; background: rgba(255,80,80,0.1); border: 1px solid rgba(255,80,80,0.25); color: #ff7070; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
-.btn-submit { width: 100%; padding: 15px; background: linear-gradient(135deg, #c850c0, #8b31b0); border: none; border-radius: 12px; color: #fff; font-family: 'Exo 2', sans-serif; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 24px rgba(200,80,192,0.4); transition: transform 0.15s; margin-top: 4px; }
-.btn-submit:active { transform: scale(0.97); }
-.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-.forgot { text-align: center; color: rgba(255,255,255,0.4); font-size: 13px; cursor: pointer; margin: 4px 0 0; }
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+.login-content { --background: #070707; font-family: 'DM Sans', sans-serif; }
+
+.grain {
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0;
+}
+
+.atm-glow {
+  position: fixed;
+  width: 280px; height: 280px;
+  background: radial-gradient(circle, rgba(139,26,26,0.16) 0%, transparent 70%);
+  top: -80px; left: 50%; transform: translateX(-50%);
+  filter: blur(50px); pointer-events: none; z-index: 0;
+}
+
+.screen {
+  position: relative; z-index: 1;
+  padding: 56px 28px 40px;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  animation: fadeUp 0.5s ease both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.back-btn {
+  width: 38px; height: 38px;
+  background: #171717; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #ede9e6; font-size: 18px; cursor: pointer;
+  margin-bottom: 36px;
+}
+
+.login-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 30px; font-weight: 800;
+  letter-spacing: -1px; line-height: 1.15;
+  color: #ede9e6; margin-bottom: 8px;
+}
+
+.login-sub {
+  color: rgba(237,233,230,0.4);
+  font-size: 14px; font-weight: 400;
+  margin-bottom: 36px; line-height: 1.5;
+}
+
+.field { margin-bottom: 18px; }
+
+.field-label {
+  display: block; color: rgba(237,233,230,0.3);
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  margin-bottom: 8px; font-family: 'DM Sans', sans-serif;
+}
+
+.input-row {
+  display: flex; align-items: center; gap: 12px;
+  background: #171717; border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px; padding: 15px 18px;
+}
+
+.input-icon { color: rgba(237,233,230,0.25); font-size: 17px; flex-shrink: 0; }
+
+.input-real {
+  background: transparent; border: none; outline: none;
+  color: #ede9e6; font-family: 'DM Sans', sans-serif;
+  font-size: 14px; font-weight: 400; width: 100%;
+}
+
+.input-real::placeholder { color: rgba(237,233,230,0.2); }
+
+.error-msg {
+  color: #a32020; font-size: 13px;
+  margin-bottom: 16px; text-align: center;
+}
+
+.login-actions { margin-top: 28px; }
+
+.btn-fill {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 17px 20px; width: 100%;
+  background: #8B1A1A; border: none; border-radius: 16px;
+  color: #ede9e6; font-family: 'Outfit', sans-serif;
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  box-shadow: 0 8px 28px rgba(139,26,26,0.4);
+}
+
+.btn-fill:disabled { opacity: 0.6; }
+
+.forgot {
+  text-align: center; margin-top: 16px;
+  color: rgba(237,233,230,0.25); font-size: 12px;
+}
 </style>
