@@ -1,9 +1,10 @@
 import express from "express";
 import cors from "cors";
 
-import authRoutes from "../routes/authRoutes.js";
-import tripRoutes from "../routes/tripRoutes.js";
-import userRoutes from "../routes/userRoutes.js";
+import authRoutes   from "../routes/authRoutes.js";
+import tripRoutes   from "../routes/tripRoutes.js";
+import userRoutes   from "../routes/userRoutes.js";
+import ratingRoutes from "../routes/ratingRoutes.js";
 
 const app = express();
 
@@ -16,9 +17,10 @@ app.get("/health", (req, res) => {
 });
 
 // Rutas
-app.use("/api/auth",  authRoutes);
-app.use("/api/trips", tripRoutes);
-app.use("/api/users", userRoutes);
+app.use("/api/auth",    authRoutes);
+app.use("/api/trips",   tripRoutes);
+app.use("/api/users",   userRoutes);
+app.use("/api/ratings", ratingRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -34,6 +34,9 @@ export default async function initDB() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verify_token TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS university VARCHAR(100)`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS refresh_token TEXT`);
 
   console.log("Tabla users lista");
 
@@ -62,4 +65,19 @@ export default async function initDB() {
   `);
 
   console.log("Tablas trips y trip_passengers listas");
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ratings (
+      id SERIAL PRIMARY KEY,
+      trip_id INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+      reviewer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reviewed_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      score INTEGER NOT NULL CHECK (score >= 1 AND score <= 5),
+      comment TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(trip_id, reviewer_id, reviewed_id)
+    );
+  `);
+
+  console.log("Tabla ratings lista");
 }
