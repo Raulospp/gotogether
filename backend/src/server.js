@@ -2,7 +2,10 @@ import "../config/env.js";
 import app from "./app.js";
 import initDB from "../config/database.js";
 
+
 const PORT = process.env.PORT || 3000;
+
+console.log(process.env.RESEND_API_KEY);
 
 initDB()
   .then(() => {
@@ -14,3 +17,4 @@ initDB()
     console.error("Error conectando a la DB:", err.message);
     process.exit(1);
   });
+
