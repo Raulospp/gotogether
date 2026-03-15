@@ -12,23 +12,28 @@ api.interceptors.request.use((config) => {
 
 export const authService = {
   async loginConductor(data: {
-    name: string; email: string; password: string; city: string;
-    car_model: string; plate: string; route?: string;
+    name: string; email: string; password: string; phone?: string;
+    city: string; car_model: string; plate: string; route?: string;
     vehicle_type: string; capacity: number;
   }) {
     const res = await api.post('/auth/register/conductor', data);
-    localStorage.setItem('token', res.data.token);
-    localStorage.setItem('user', JSON.stringify(res.data.user));
+    // Registro no devuelve token — solo guarda el user
+    if (res.data.token) {
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+    }
     return res.data;
   },
 
   async loginPasajero(data: {
-    name: string; email: string; password: string;
+    name: string; email: string; password: string; phone?: string;
     city: string; university: string; route?: string;
   }) {
     const res = await api.post('/auth/register/pasajero', data);
-    localStorage.setItem('token', res.data.token);
-    localStorage.setItem('user', JSON.stringify(res.data.user));
+    if (res.data.token) {
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+    }
     return res.data;
   },
 

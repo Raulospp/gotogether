@@ -8,7 +8,12 @@ const routes: Array<RouteRecordRaw> = [
   { path: '/register/tipo', component: () => import('@/views/RegisterTipoView.vue') },
   { path: '/register/conductor', component: () => import('@/views/RegisterConductorView.vue') },
   { path: '/register/pasajero', component: () => import('@/views/RegisterPasajeroView.vue') },
+  { path: '/inicio', component: () => import('@/views/InicioView.vue') },
   { path: '/home', component: () => import('@/views/HomeView.vue') },
+  { path: '/feed', component: () => import('@/views/FeedView.vue') },
+  { path: '/solicitudes', component: () => import('@/views/SolicitudesView.vue') },
+  { path: '/perfil/:role/:id', component: () => import('@/views/PerfilView.vue') },
+  { path: '/editar-perfil', component: () => import('@/views/EditarPerfilView.vue') },
 ];
 
 const router = createRouter({

@@ -61,12 +61,20 @@ const password = ref('');
 const error = ref('');
 const loading = ref(false);
 
+const role = route.params.role as string; // 'conductor' o 'pasajero'
+
 async function handleLogin() {
   error.value = '';
   loading.value = true;
   try {
     await authStore.login(email.value, password.value);
-    router.replace('/home');
+    const userRole = authStore.user?.role;
+    if (userRole !== role) {
+      authStore.logout();
+      error.value = `Esta cuenta es de ${userRole === 'conductor' ? 'conductor' : 'pasajero'}. Ingresa por la opción correcta.`;
+      return;
+    }
+    router.replace('/inicio');
   } catch (e: any) {
     error.value = e.message || 'Error al iniciar sesión';
   } finally {

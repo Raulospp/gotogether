@@ -6,34 +6,33 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<{
     id: number; name: string; email: string; role: string;
     city?: string; university?: string; car_model?: string;
-    plate?: string; route?: string; vehicle_type?: string; capacity?: number;
+    plate?: string; route?: string; vehicle_type?: string;
+    capacity?: number; phone?: string;
   } | null>(authService.getUser());
   const isLoggedIn = ref(authService.isAuthenticated());
   const loading = ref(false);
   const error = ref('');
 
   async function registerConductor(data: {
-    name: string; email: string; password: string;
+    name: string; email: string; password: string; phone?: string;
     city: string; car_model: string; plate: string; route?: string;
     vehicle_type: string; capacity: number;
   }) {
     loading.value = true; error.value = '';
     try {
       await authService.loginConductor(data);
-      // No hacer login automático — esperar verificación de correo
     } catch (err: any) {
       error.value = err.response?.data?.message || 'Error al registrarse'; throw err;
     } finally { loading.value = false; }
   }
 
   async function registerPasajero(data: {
-    name: string; email: string; password: string;
+    name: string; email: string; password: string; phone?: string;
     city: string; university: string; route?: string;
   }) {
     loading.value = true; error.value = '';
     try {
       await authService.loginPasajero(data);
-      // No hacer login automático — esperar verificación de correo
     } catch (err: any) {
       error.value = err.response?.data?.message || 'Error al registrarse'; throw err;
     } finally { loading.value = false; }

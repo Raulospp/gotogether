@@ -40,7 +40,7 @@
         <div v-else class="bio-edit">
           <textarea v-model="bio" placeholder="Cuéntanos sobre ti..." rows="3" @blur="saveBio" />
         </div>
-        <button class="edit-profile-btn">Editar perfil</button>
+        <button class="edit-profile-btn" @click="router.push('/editar-perfil')">Editar perfil</button>
       </div>
 
       <div class="tabs">
@@ -89,27 +89,37 @@
 
       <!-- Horarios -->
       <div v-if="activeTab === 'schedule'" class="tab-content">
+        <p class="schedule-hint">Selecciona a qué hora sales y vuelves cada día. Se guarda automáticamente.</p>
         <div v-for="dia in dias" :key="dia.key" class="day-card">
           <button class="day-card-header" @click="toggleDia('schedule', dia.key)">
             <span class="day-name">{{ dia.label }}</span>
             <div class="day-chips">
               <span v-if="schedule[dia.key].ida" class="day-chip">↑ {{ schedule[dia.key].ida }}</span>
               <span v-if="schedule[dia.key].vuelta" class="day-chip">↓ {{ schedule[dia.key].vuelta }}</span>
+              <span v-if="!schedule[dia.key].ida && !schedule[dia.key].vuelta" class="day-chip empty">Sin horario</span>
             </div>
             <ion-icon :icon="openDias.schedule[dia.key] ? chevronUpOutline : chevronDownOutline" class="day-chevron" />
           </button>
           <div v-if="openDias.schedule[dia.key]" class="day-card-body">
             <div class="day-field-row">
               <div class="day-field">
-                <span class="day-field-label">Ida</span>
-                <input v-model="schedule[dia.key].ida" type="text" placeholder="6:30 AM" class="schedule-day-input" @input="saveSchedule" />
+                <span class="day-field-label">↑ Ida</span>
+                <select v-model="schedule[dia.key].ida" class="time-select" @change="autoSave(dia.key)">
+                  <option value="">Sin horario</option>
+                  <option v-for="h in horas" :key="h" :value="h">{{ h }}</option>
+                </select>
               </div>
               <div class="day-field">
-                <span class="day-field-label">Vuelta</span>
-                <input v-model="schedule[dia.key].vuelta" type="text" placeholder="5:00 PM" class="schedule-day-input" @input="saveSchedule" />
+                <span class="day-field-label">↓ Vuelta</span>
+                <select v-model="schedule[dia.key].vuelta" class="time-select" @change="autoSave(dia.key)">
+                  <option value="">Sin horario</option>
+                  <option v-for="h in horas" :key="h" :value="h">{{ h }}</option>
+                </select>
               </div>
             </div>
-            <button class="btn-save-sm" @click="saveSchedule"><ion-icon :icon="checkmarkOutline" /> Guardar</button>
+            <div class="save-indicator" :class="{ visible: savedDia === dia.key }">
+              <ion-icon :icon="checkmarkCircleOutline" /> ¡Guardado!
+            </div>
           </div>
         </div>
       </div>
@@ -147,7 +157,7 @@
             </div>
             <div class="day-actions">
               <button class="btn-add" @click="addStop(dia.key)"><ion-icon :icon="addOutline" /> Parada</button>
-              <button class="btn-save-sm" @click="saveRoutes"><ion-icon :icon="checkmarkOutline" /> Guardar</button>
+              <button class="btn-save-sm" :class="{ saved: savedDia === dia.key }" @click="saveAndClose('route', dia.key)"><ion-icon :icon="savedDia === dia.key ? checkmarkCircleOutline : checkmarkOutline" /> {{ savedDia === dia.key ? '¡Guardado!' : 'Guardar' }}</button>
             </div>
           </div>
         </div>
@@ -161,19 +171,41 @@
         </div>
       </div>
 
+
+      <!-- Nav Bar -->
+      <div class="bottom-nav">
+        <button class="nav-item" @click="router.push('/inicio')">
+          <ion-icon :icon="homeOutline" />
+          <span>Inicio</span>
+        </button>
+        <button class="nav-item" @click="router.push('/feed')">
+          <ion-icon :icon="searchOutline" />
+          <span>Explorar</span>
+        </button>
+        <button class="nav-item" @click="router.push('/solicitudes')">
+          <ion-icon :icon="documentTextOutline" />
+          <span>Solicitudes</span>
+        </button>
+        <button class="nav-item active">
+          <ion-icon :icon="personOutline" />
+          <span>Perfil</span>
+          <div class="nav-dot"></div>
+        </button>
+      </div>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, watch } from 'vue';
+import { ref, computed, reactive, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonIcon } from '@ionic/vue';
 import {
-  logOutOutline, cameraOutline, createOutline, checkmarkOutline,
+  logOutOutline, cameraOutline, createOutline, checkmarkOutline, checkmarkCircleOutline,
   addOutline, closeOutline, starOutline, carOutline, personOutline,
   mailOutline, schoolOutline, locationOutline, cardOutline, timeOutline,
   mapOutline, speedometerOutline, chevronUpOutline, chevronDownOutline,
+  homeOutline, searchOutline, documentTextOutline,
 } from 'ionicons/icons';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -183,8 +215,9 @@ const user = computed(() => authStore.user);
 const isConductor = computed(() => user.value?.role === 'conductor');
 const userInitial = computed(() => user.value?.name?.charAt(0).toUpperCase() || '?');
 
-// Clave única por usuario
-const k = (key: string) => `user_${user.value?.id || 'guest'}_${key}`;
+// Clave única por usuario — se calcula una sola vez al montar
+const userId = authStore.user?.id || 'guest';
+const k = (key: string) => `user_${userId}_${key}`;
 
 const profilePhoto = ref<string | null>(localStorage.getItem(k('profilePhoto')));
 const photoInput = ref<HTMLInputElement | null>(null);
@@ -204,6 +237,18 @@ const bio = ref(localStorage.getItem(k('bio')) || '');
 const editingBio = ref(false);
 function saveBio() { editingBio.value = false; localStorage.setItem(k('bio'), bio.value); }
 
+// Horas cada 30 min de 5:00 AM a 10:00 PM
+const horas = (() => {
+  const list = [];
+  for (let h = 5; h <= 22; h++) {
+    const ampm = h < 12 ? 'AM' : 'PM';
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    list.push(`${h12}:00 ${ampm}`);
+    if (h < 22) list.push(`${h12}:30 ${ampm}`);
+  }
+  return list;
+})();
+
 const dias = [
   { key: 'lunes', label: 'Lunes' },
   { key: 'martes', label: 'Martes' },
@@ -215,13 +260,73 @@ const dias = [
 
 const defaultSchedule = () => Object.fromEntries(dias.map(d => [d.key, { ida: '', vuelta: '' }]));
 const schedule = ref(JSON.parse(localStorage.getItem(k('schedule')) || 'null') || defaultSchedule());
-function saveSchedule() { localStorage.setItem(k('schedule'), JSON.stringify(schedule.value)); }
+async function saveSchedule() {
+  localStorage.setItem(k('schedule'), JSON.stringify(schedule.value));
+  await syncHorarioDB();
+}
 
 const defaultRoutes = () => Object.fromEntries(dias.map(d => [d.key, { stops: ['', ''] }]));
 const routes = ref(JSON.parse(localStorage.getItem(k('routes')) || 'null') || defaultRoutes());
 function addStop(diaKey: string) { routes.value[diaKey].stops.splice(routes.value[diaKey].stops.length - 1, 0, ''); }
 function removeStop(diaKey: string, i: number) { routes.value[diaKey].stops.splice(i, 1); }
-function saveRoutes() { localStorage.setItem(k('routes'), JSON.stringify(routes.value)); }
+async function saveRoutes() {
+  localStorage.setItem(k('routes'), JSON.stringify(routes.value));
+  await syncHorarioDB();
+}
+
+async function syncHorarioDB() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) { console.warn('syncHorarioDB: no token'); return; }
+    console.log('Sincronizando horario...', schedule.value);
+    const res = await fetch('http://localhost:3000/api/horarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ schedule: schedule.value, routes: routes.value }),
+    });
+    const data = await res.json();
+    console.log('Horario sincronizado:', data);
+  } catch (e) { console.error('Error sincronizando horario:', e); }
+}
+
+// Cargar horario desde la DB al iniciar
+async function loadHorarioDB() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const res = await fetch('http://localhost:3000/api/horarios/me', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.schedule && Object.keys(data.schedule).length > 0) {
+      schedule.value = { ...defaultSchedule(), ...data.schedule };
+      localStorage.setItem(k('schedule'), JSON.stringify(schedule.value));
+    }
+    if (data.routes && Object.keys(data.routes).length > 0) {
+      routes.value = { ...defaultRoutes(), ...data.routes };
+      localStorage.setItem(k('routes'), JSON.stringify(routes.value));
+    }
+  } catch (e) { console.error('Error cargando horario:', e); }
+}
+
+onMounted(loadHorarioDB);
+
+const savedDia = ref('');
+async function autoSave(diaKey: string) {
+  await saveSchedule();
+  savedDia.value = diaKey;
+  setTimeout(() => { savedDia.value = ''; }, 1500);
+}
+async function saveAndClose(tab: string, key: string) {
+  if (tab === 'schedule') await saveSchedule();
+  else await saveRoutes();
+  savedDia.value = key;
+  setTimeout(() => {
+    (openDias as any)[tab][key] = false;
+    savedDia.value = '';
+  }, 800);
+}
 
 // Recargar datos si el usuario cambia
 watch(user, () => {
@@ -347,8 +452,48 @@ function handleLogout() { authStore.logout(); router.replace('/welcome'); }
 
 .day-actions { display: flex; gap: 8px; margin-top: 10px; }
 .btn-add { background: rgba(139,26,26,0.12); border: 1px solid rgba(139,26,26,0.25); border-radius: 8px; color: #a32020; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; padding: 7px 12px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-.btn-save-sm { display: flex; align-items: center; gap: 5px; background: #8B1A1A; border: none; border-radius: 8px; color: #ede9e6; font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600; padding: 7px 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(139,26,26,0.3); }
+.btn-save-sm { display: flex; align-items: center; gap: 5px; background: #8B1A1A; border: none; border-radius: 8px; color: #ede9e6; font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600; padding: 7px 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(139,26,26,0.3); transition: background 0.3s; }
+.btn-save-sm.saved { background: #1a6b1a; box-shadow: 0 4px 12px rgba(26,107,26,0.3); }
+
+.schedule-hint { color: rgba(237,233,230,0.3); font-size: 11.5px; padding: 0 16px 12px; font-family: 'DM Sans', sans-serif; }
+
+.day-chip.empty { color: rgba(237,233,230,0.2); background: transparent; border-color: rgba(255,255,255,0.05); }
+
+.time-select {
+  width: 100%; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; padding: 10px 12px; color: #ede9e6;
+  font-family: 'DM Sans', sans-serif; font-size: 13px;
+  outline: none; cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(237,233,230,0.3)' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.time-select:focus { border-color: rgba(139,26,26,0.5); }
+.time-select option { background: #1a1a1a; color: #ede9e6; }
+
+.save-indicator {
+  display: flex; align-items: center; gap: 6px;
+  color: #25d366; font-size: 12px; font-weight: 600;
+  font-family: 'Outfit', sans-serif; padding: 6px 0 0;
+  opacity: 0; transition: opacity 0.3s ease;
+}
+.save-indicator.visible { opacity: 1; }
 
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 0; color: rgba(237,233,230,0.25); }
 .empty-icon { font-size: 32px; }
+
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(7,7,7,0.96); backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255,255,255,0.07);
+  display: flex; padding: 10px 0 20px;
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 600;
+  letter-spacing: 0.5px; text-transform: uppercase;
+  color: rgba(237,233,230,0.22); cursor: pointer; border: none; background: transparent;
+}
+.nav-item ion-icon { font-size: 20px; }
+.nav-item.active { color: #a32020; }
+.nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #a32020; margin-top: -2px; }
 </style>
