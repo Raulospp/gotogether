@@ -145,9 +145,10 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <span>Explorar</span>
         </button>
-        <button class="nav-item" @click="router.push('/solicitudes')">
+        <button class="nav-item" @click="router.push('/solicitudes')" style="position:relative">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <span>Solicitudes</span>
+          <div v-if="pendientesCount > 0" class="nav-badge">{{ pendientesCount }}</div>
         </button>
         <button class="nav-item" @click="router.push('/home')">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -171,6 +172,18 @@ const user = computed(() => authStore.user);
 const isConductor = computed(() => user.value?.role === 'conductor');
 
 const API = 'http://localhost:3000';
+const pendientesCount = ref(0);
+
+async function fetchPendientesCount() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const res = await fetch(`${API}/api/solicitudes/pendientes-count`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) { const data = await res.json(); pendientesCount.value = data.count; }
+  } catch(e) {}
+}
 const loadingSolicitudes = ref(false);
 const loadingFeed = ref(false);
 const solicitudes = ref<any[]>([]);
@@ -229,7 +242,7 @@ async function fetchFeed() {
   finally { loadingFeed.value = false; }
 }
 
-onMounted(() => { fetchSolicitudes(); fetchFeed(); });
+onMounted(() => { fetchSolicitudes(); fetchFeed(); fetchPendientesCount(); });
 
 // ── Computeds ─────────────────────────────────────────────────────────────────
 const solicitudesPendientes = computed(() => solicitudes.value.filter(s => s.estado === 'pendiente'));
@@ -352,4 +365,5 @@ function showToast(msg: string, type: 'success'|'error' = 'success') {
 .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: rgba(237,233,230,0.22); cursor: pointer; border: none; background: transparent; }
 .nav-item.active { color: #a32020; }
 .nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #a32020; margin-top: -2px; }
+.nav-badge { position: absolute; top: 2px; right: 14px; background: #a32020; color: #ede9e6; border-radius: 10px; font-size: 8px; font-weight: 700; padding: 1px 5px; min-width: 14px; text-align: center; }
 </style>

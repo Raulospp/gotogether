@@ -81,7 +81,7 @@
               <span v-if="getHorario(u,'ida')" class="sched-chip on">↑ {{ getHorario(u,'ida') }}</span>
               <span v-if="getHorario(u,'vuelta')" class="sched-chip on">↓ {{ getHorario(u,'vuelta') }}</span>
               <span v-if="!getHorario(u,'ida') && !getHorario(u,'vuelta')" class="sched-chip">Sin horario hoy</span>
-              <span v-if="!isConductor && u.capacity" class="sched-chip">{{ u.capacity }} cupos</span>
+              <span v-if="!isConductor && u.cupos_disponibles !== undefined" class="sched-chip" :class="u.cupos_disponibles <= 0 ? 'chip-full' : ''">{{ u.cupos_disponibles > 0 ? u.cupos_disponibles + ' cupos' : 'Sin cupos' }}</span>
             </div>
           </div>
 
@@ -94,7 +94,17 @@
               <button v-if="u.phone" class="btn-wpp" @click.stop="contactarWpp(u.phone)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.853L0 24l6.335-1.521A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.645-.52-5.148-1.422l-.369-.218-3.763.904.937-3.666-.242-.381A9.96 9.96 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
               </button>
-              <button class="btn-main" @click.stop="enviarSolicitud(u)">
+              <!-- Ya solicitado -->
+              <button v-if="(isConductor && u.ya_invitado) || (!isConductor && u.ya_solicitado)" class="btn-sent" disabled>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                {{ isConductor ? 'Invitado' : 'Solicitado' }}
+              </button>
+              <!-- Sin cupos (solo conductor) -->
+              <button v-else-if="!isConductor && u.cupos_disponibles <= 0" class="btn-full" disabled>
+                Sin cupos
+              </button>
+              <!-- Normal -->
+              <button v-else class="btn-main" @click.stop="enviarSolicitud(u)">
                 {{ isConductor ? 'Invitar a viajar' : 'Solicitar cupo' }}
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </button>
@@ -185,9 +195,10 @@
           <span>Explorar</span>
           <div class="nav-dot"></div>
         </button>
-        <button class="nav-item" @click="router.push('/solicitudes')">
+        <button class="nav-item" @click="router.push('/solicitudes')" style="position:relative">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <span>Solicitudes</span>
+          <div v-if="pendientesCount > 0" class="nav-badge">{{ pendientesCount }}</div>
         </button>
         <button class="nav-item" @click="router.push('/home')">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -219,6 +230,21 @@ const usuarios = ref<any[]>([]);
 const solicitudes = ref<any[]>([]);
 
 const API = 'http://localhost:3000';
+const pendientesCount = ref(0);
+
+async function fetchPendientesCount() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const res = await fetch(`${API}/api/solicitudes/pendientes-count`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      pendientesCount.value = data.count;
+    }
+  } catch(e) { console.error(e); }
+}
 
 const diasMap: Record<number, string> = {
   0: 'domingo', 1: 'lunes', 2: 'martes', 3: 'miercoles',
@@ -276,16 +302,13 @@ async function fetchSolicitudes() {
 
 onMounted(() => {
   fetchUsuarios();
-  // Si viene con ?tab=solicitudes abrir directo esa tab
+  fetchPendientesCount();
   if (route.query.tab === 'solicitudes') {
     activeTab.value = 'solicitudes';
     fetchSolicitudes();
   }
 });
 
-const pendientesCount = computed(() =>
-  solicitudes.value.filter(s => s.estado === 'pendiente').length
-);
 
 function getHorario(u: any, tipo: 'ida' | 'vuelta') {
   return u.schedule?.[diaHoy]?.[tipo] || '';
@@ -514,6 +537,20 @@ async function responderSolicitud(id: number, estado: string) {
   border-radius: 10px; color: #25d366;
   width: 36px; height: 36px; cursor: pointer; flex-shrink: 0;
 }
+.btn-sent {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; color: rgba(237,233,230,0.4);
+  font-family: 'Outfit', sans-serif; font-size: 11.5px; font-weight: 700;
+  padding: 8px 13px; cursor: not-allowed; white-space: nowrap;
+}
+.btn-full {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; color: rgba(237,233,230,0.3);
+  font-family: 'Outfit', sans-serif; font-size: 11.5px; font-weight: 700;
+  padding: 8px 13px; cursor: not-allowed;
+}
+.chip-full { background: rgba(255,60,60,0.08) !important; border-color: rgba(255,60,60,0.15) !important; color: rgba(255,100,100,0.6) !important; }
 
 .sol-fecha { display: flex; align-items: center; gap: 6px; padding: 8px 16px 4px; font-size: 11px; color: rgba(237,233,230,0.3); }
 
@@ -566,4 +603,5 @@ async function responderSolicitud(id: number, estado: string) {
 }
 .nav-item.active { color: #a32020; }
 .nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #a32020; margin-top: -2px; }
+.nav-badge { position: absolute; top: 2px; right: 14px; background: #a32020; color: #ede9e6; border-radius: 10px; font-size: 8px; font-weight: 700; padding: 1px 5px; min-width: 14px; text-align: center; }
 </style>

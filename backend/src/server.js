@@ -257,7 +257,15 @@ app.get('/api/users/conductores', authMiddleware, async function(req, res) {
     var result = await pool.query(`
       SELECT u.id, u.name, u.email, u.city, u.car_model, u.plate, u.vehicle_type, u.capacity, u.phone,
              COALESCE(h.schedule, '{}') as schedule,
-             COALESCE(h.routes, '{}') as routes
+             COALESCE(h.routes, '{}') as routes,
+             u.capacity - COALESCE(
+               (SELECT COUNT(*) FROM solicitudes s
+                WHERE s.conductor_id = u.id AND s.estado = 'aceptada'), 0
+             ) as cupos_disponibles,
+             EXISTS(
+               SELECT 1 FROM solicitudes s
+               WHERE s.conductor_id = u.id AND s.pasajero_id = $2 AND s.estado IN ('pendiente','aceptada')
+             ) as ya_solicitado
       FROM users u
       LEFT JOIN horarios h ON h.user_id = u.id
       WHERE u.role = $1 AND u.id != $2
@@ -274,7 +282,11 @@ app.get('/api/users/pasajeros', authMiddleware, async function(req, res) {
   try {
     var result = await pool.query(`
       SELECT u.id, u.name, u.email, u.city, u.university, u.phone,
-             COALESCE(h.schedule, '{}') as schedule
+             COALESCE(h.schedule, '{}') as schedule,
+             EXISTS(
+               SELECT 1 FROM solicitudes s
+               WHERE s.pasajero_id = u.id AND s.conductor_id = $2 AND s.estado IN ('pendiente','aceptada')
+             ) as ya_invitado
       FROM users u
       LEFT JOIN horarios h ON h.user_id = u.id
       WHERE u.role = $1 AND u.id != $2
@@ -410,6 +422,22 @@ app.patch('/api/solicitudes/:id', authMiddleware, async function(req, res) {
     );
 
     res.json({ message: 'Solicitud aceptada', solicitud: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
+// ─── CONTEO PENDIENTES (para badge nav bar) ──────────────────────────────────
+
+app.get('/api/solicitudes/pendientes-count', authMiddleware, async function(req, res) {
+  try {
+    var userId = req.user.id;
+    var result = await pool.query(
+      'SELECT COUNT(*) as count FROM solicitudes WHERE iniciado_por != $1 AND (conductor_id = $1 OR pasajero_id = $1) AND estado = $2',
+      [userId, 'pendiente']
+    );
+    res.json({ count: parseInt(result.rows[0].count) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error interno del servidor' });

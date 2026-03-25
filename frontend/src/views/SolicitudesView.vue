@@ -157,6 +157,18 @@ const myId = computed(() => authStore.user?.id);
 const isConductor = computed(() => authStore.user?.role === 'conductor');
 
 const API = 'http://localhost:3000';
+const pendientesCount = ref(0);
+
+async function fetchPendientesCount() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const res = await fetch(`${API}/api/solicitudes/pendientes-count`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) { const data = await res.json(); pendientesCount.value = data.count; }
+  } catch(e) {}
+}
 const loading = ref(false);
 const activeTab = ref('recibidas');
 const todasSolicitudes = ref<any[]>([]);
@@ -174,7 +186,7 @@ async function fetchSolicitudes() {
   finally { loading.value = false; }
 }
 
-onMounted(fetchSolicitudes);
+onMounted(() => { fetchSolicitudes(); fetchPendientesCount(); });
 
 // Recibidas: yo NO la inicié
 const recibidas = computed(() =>
@@ -328,4 +340,5 @@ function showToast(msg: string, type: 'success'|'error' = 'success') {
 .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: rgba(237,233,230,0.22); cursor: pointer; border: none; background: transparent; }
 .nav-item.active { color: #a32020; }
 .nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #a32020; margin-top: -2px; }
+.nav-badge { position: absolute; top: 2px; right: 14px; background: #a32020; color: #ede9e6; border-radius: 10px; font-size: 8px; font-weight: 700; padding: 1px 5px; min-width: 14px; text-align: center; }
 </style>
