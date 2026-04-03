@@ -129,25 +129,18 @@
         <div class="sec">
           <div class="sec-title">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            Mis viajes esta semana
+            Mis viajes de hoy
           </div>
         </div>
 
         <div v-if="loadingViajes" class="empty-row">
           <div class="spinner-sm"></div> Cargando...
         </div>
-        <div v-else-if="viajesPorDia.length === 0" class="empty-row">
-          Sin viajes confirmados esta semana
+        <div v-else-if="viajesHoy.length === 0" class="empty-row">
+          Sin viajes confirmados hoy
         </div>
 
-        <template v-else v-for="grupo in viajesPorDia" :key="grupo.dia">
-          <!-- Separador de día -->
-          <div class="viaje-dia-header" :class="{ pasado: grupo.pasado }">
-            <span class="viaje-dia-label">{{ grupo.diaLabel }}</span>
-            <span v-if="grupo.pasado" class="viaje-dia-tag">Pasado</span>
-            <span v-else-if="grupo.esHoy" class="viaje-dia-tag hoy">Hoy</span>
-          </div>
-        <div v-for="v in grupo.viajes" :key="v.solicitud_id" class="viaje-card" :class="{ pasado: grupo.pasado }" @click="viajeAbierto = viajeAbierto === v.solicitud_id ? null : v.solicitud_id">
+        <div v-else v-for="v in viajesHoy" :key="v.solicitud_id" class="viaje-card" @click="viajeAbierto = viajeAbierto === v.solicitud_id ? null : v.solicitud_id">
           <!-- Header del viaje -->
           <div class="viaje-top">
             <div class="viaje-avatar" :style="`background:${avatarColor(isConductor ? v.pasajero_name : v.conductor_name)}`">
@@ -158,7 +151,7 @@
               <div class="viaje-sub">{{ isConductor ? v.pasajero_university : v.car_model }} · {{ isConductor ? v.pasajero_city : v.conductor_city }}</div>
             </div>
             <div class="viaje-right">
-              <div v-if="getPrecioHoy(v, grupo.dia)" class="viaje-precio">${{ getPrecioHoy(v, grupo.dia) }}</div>
+              <div v-if="getPrecioHoy(v)" class="viaje-precio">${{ getPrecioHoy(v) }}</div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="viajeAbierto === v.solicitud_id ? 'transform:rotate(180deg)' : ''"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
           </div>
@@ -169,28 +162,28 @@
 
             <!-- Horario del día -->
             <div class="viaje-horario">
-              <div class="viaje-slot" v-if="getHorarioViaje(v, 'ida', grupo.dia)">
+              <div class="viaje-slot" v-if="getHorarioViaje(v, 'ida')">
                 <span class="slot-dir">↑ Salida</span>
-                <span class="slot-time">{{ getHorarioViaje(v, 'ida', grupo.dia) }}</span>
+                <span class="slot-time">{{ getHorarioViaje(v, 'ida') }}</span>
               </div>
-              <div class="viaje-slot" v-if="getHorarioViaje(v, 'vuelta', grupo.dia)">
+              <div class="viaje-slot" v-if="getHorarioViaje(v, 'vuelta')">
                 <span class="slot-dir">↓ Regreso</span>
-                <span class="slot-time">{{ getHorarioViaje(v, 'vuelta', grupo.dia) }}</span>
+                <span class="slot-time">{{ getHorarioViaje(v, 'vuelta') }}</span>
               </div>
             </div>
 
             <!-- Ruta -->
-            <div v-if="getRutaViaje(v, grupo.dia).length > 0" class="viaje-ruta">
-              <div v-for="(stop, i) in getRutaViaje(v, grupo.dia)" :key="i" class="viaje-stop">
+            <div v-if="getRutaViaje(v).length > 0" class="viaje-ruta">
+              <div v-for="(stop, i) in getRutaViaje(v)" :key="i" class="viaje-stop">
                 <div class="vstop-dot" :class="i === 0 ? 'start' : i === getRutaViaje(v).length-1 ? 'end' : 'mid'"></div>
                 <span class="vstop-label">{{ stop }}</span>
               </div>
             </div>
 
             <!-- Precio -->
-            <div v-if="getPrecioHoy(v, grupo.dia)" class="viaje-precio-row">
+            <div v-if="getPrecioHoy(v)" class="viaje-precio-row">
               <span>Valor del viaje</span>
-              <span class="precio-val">${{ Number(getPrecioHoy(v, grupo.dia)).toLocaleString('es-CO') }}</span>
+              <span class="precio-val">${{ Number(getPrecioHoy(v)).toLocaleString('es-CO') }}</span>
             </div>
 
             <!-- WhatsApp -->
@@ -201,7 +194,6 @@
             </button>
           </div>
         </div>
-        </template>
 
         <div style="height:20px"></div>
 
@@ -320,46 +312,8 @@ async function fetchViajes() {
   finally { loadingViajes.value = false; }
 }
 
-// Días de la semana ordenados
-const diasSemana = [
-  { key: 'lunes', label: 'Lunes', num: 1 },
-  { key: 'martes', label: 'Martes', num: 2 },
-  { key: 'miercoles', label: 'Miércoles', num: 3 },
-  { key: 'jueves', label: 'Jueves', num: 4 },
-  { key: 'viernes', label: 'Viernes', num: 5 },
-  { key: 'sabado', label: 'Sábado', num: 6 },
-];
-
-const diaNumHoy = now.getDay(); // 0=dom, 1=lun...
-
-// Agrupar viajes por día de la semana
-const viajesPorDia = computed(() => {
-  const grupos: any[] = [];
-  for (const dia of diasSemana) {
-    // Ver qué viajes tienen horario para este día
-    const viajesDelDia = viajes.value.filter(v =>
-      v.schedule?.[dia.key]?.ida || v.schedule?.[dia.key]?.vuelta
-    );
-    if (viajesDelDia.length === 0) continue;
-
-    const pasado = dia.num < diaNumHoy;
-    const esHoy = dia.num === diaNumHoy;
-
-    grupos.push({
-      dia: dia.key,
-      diaLabel: dia.label,
-      pasado,
-      esHoy,
-      viajes: viajesDelDia,
-    });
-  }
-  // Ordenar: hoy primero, luego futuros, pasados al final
-  return [
-    ...grupos.filter(g => g.esHoy),
-    ...grupos.filter(g => !g.esHoy && !g.pasado),
-    ...grupos.filter(g => g.pasado),
-  ];
-});
+// Solo viajes de hoy
+const viajesHoy = computed(() => viajes.value);
 
 function getHorarioViaje(v: any, tipo: 'ida'|'vuelta', dia?: string) {
   const d = dia || diaHoy;
