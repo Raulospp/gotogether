@@ -43,6 +43,7 @@ async function initDB() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verify_token TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)`);
   await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS iniciado_por INTEGER REFERENCES users(id) ON DELETE CASCADE`);
+  await pool.query(`ALTER TABLE horarios ADD COLUMN IF NOT EXISTS precio JSONB DEFAULT '{}'`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS solicitudes (
@@ -258,17 +259,22 @@ app.get('/api/users/conductores', authMiddleware, async function(req, res) {
       SELECT u.id, u.name, u.email, u.city, u.car_model, u.plate, u.vehicle_type, u.capacity, u.phone,
              COALESCE(h.schedule, '{}') as schedule,
              COALESCE(h.routes, '{}') as routes,
+             COALESCE(h.precio, '{}') as precio,
              u.capacity - COALESCE(
                (SELECT COUNT(*) FROM solicitudes s
                 WHERE s.conductor_id = u.id AND s.estado = 'aceptada'), 0
              ) as cupos_disponibles,
              EXISTS(
                SELECT 1 FROM solicitudes s
-               WHERE s.conductor_id = u.id AND s.pasajero_id = $2 AND s.estado IN ('pendiente','aceptada')
+               WHERE s.conductor_id = u.id AND s.pasajero_id = $2 AND s.estado IN ('pendiente','aceptada') AND s.fecha_viaje = CURRENT_DATE
              ) as ya_solicitado
       FROM users u
       LEFT JOIN horarios h ON h.user_id = u.id
       WHERE u.role = $1 AND u.id != $2
+        AND NOT EXISTS (
+          SELECT 1 FROM solicitudes s
+          WHERE s.conductor_id = u.id AND s.pasajero_id = $2 AND s.estado = 'aceptada'
+        )
       ORDER BY u.created_at DESC
     `, ['conductor', req.user.id]);
     res.json(result.rows);
@@ -285,7 +291,7 @@ app.get('/api/users/pasajeros', authMiddleware, async function(req, res) {
              COALESCE(h.schedule, '{}') as schedule,
              EXISTS(
                SELECT 1 FROM solicitudes s
-               WHERE s.pasajero_id = u.id AND s.conductor_id = $2 AND s.estado IN ('pendiente','aceptada')
+               WHERE s.pasajero_id = u.id AND s.conductor_id = $2 AND s.estado IN ('pendiente','aceptada') AND s.fecha_viaje = CURRENT_DATE
              ) as ya_invitado
       FROM users u
       LEFT JOIN horarios h ON h.user_id = u.id
@@ -486,6 +492,67 @@ app.patch('/api/auth/profile', authMiddleware, async function(req, res) {
   }
 });
 
+// ─── MIS VIAJES ──────────────────────────────────────────────────────────────
+
+app.get('/api/viajes/mis-viajes', authMiddleware, async function(req, res) {
+  try {
+    var userId = req.user.id;
+    var userRole = req.user.role;
+    var result;
+
+    if (userRole === 'conductor') {
+      // Conductor ve sus pasajeros aceptados
+      result = await pool.query(`
+        SELECT s.id as solicitud_id, s.created_at,
+               p.id as pasajero_id, p.name as pasajero_name, p.city as pasajero_city,
+               p.university as pasajero_university, p.phone as pasajero_phone,
+               COALESCE(h.schedule, '{}') as schedule,
+               COALESCE(h.routes, '{}') as routes,
+               COALESCE(h.precio, '{}') as precio
+        FROM solicitudes s
+        JOIN users p ON p.id = s.pasajero_id
+        LEFT JOIN horarios h ON h.user_id = s.conductor_id
+        WHERE s.conductor_id = $1 AND s.estado = 'aceptada'
+        ORDER BY s.created_at DESC
+      `, [userId]);
+    } else {
+      // Pasajero ve sus conductores aceptados
+      result = await pool.query(`
+        SELECT s.id as solicitud_id, s.created_at,
+               c.id as conductor_id, c.name as conductor_name, c.city as conductor_city,
+               c.car_model, c.plate, c.vehicle_type, c.phone as conductor_phone,
+               COALESCE(h.schedule, '{}') as schedule,
+               COALESCE(h.routes, '{}') as routes,
+               COALESCE(h.precio, '{}') as precio
+        FROM solicitudes s
+        JOIN users c ON c.id = s.conductor_id
+        LEFT JOIN horarios h ON h.user_id = s.conductor_id
+        WHERE s.pasajero_id = $1 AND s.estado = 'aceptada'
+        ORDER BY s.created_at DESC
+      `, [userId]);
+    }
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
+// ─── LIMPIAR VIAJES PASADOS ──────────────────────────────────────────────────
+// Se llama automáticamente, elimina solicitudes aceptadas con fecha anterior a hoy
+app.delete('/api/viajes/limpiar-pasados', authMiddleware, async function(req, res) {
+  try {
+    var result = await pool.query(
+      "DELETE FROM solicitudes WHERE estado = 'aceptada' AND fecha_viaje < CURRENT_DATE RETURNING id"
+    );
+    res.json({ message: `${result.rowCount} viajes pasados eliminados` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
 // ─── HORARIOS ────────────────────────────────────────────────────────────────
 
 // Guardar horario y rutas del usuario
@@ -494,12 +561,13 @@ app.post('/api/horarios', authMiddleware, async function(req, res) {
     var { schedule, routes } = req.body;
     var userId = req.user.id;
 
+    var { precio } = req.body;
     await pool.query(`
-      INSERT INTO horarios (user_id, schedule, routes, updated_at)
-      VALUES ($1, $2, $3, NOW())
+      INSERT INTO horarios (user_id, schedule, routes, precio, updated_at)
+      VALUES ($1, $2, $3, $4, NOW())
       ON CONFLICT (user_id) DO UPDATE
-      SET schedule = $2, routes = $3, updated_at = NOW()
-    `, [userId, JSON.stringify(schedule || {}), JSON.stringify(routes || {})]);
+      SET schedule = $2, routes = $3, precio = $4, updated_at = NOW()
+    `, [userId, JSON.stringify(schedule || {}), JSON.stringify(routes || {}), JSON.stringify(precio || {})]);
 
     res.json({ message: 'Horario guardado' });
   } catch (err) {

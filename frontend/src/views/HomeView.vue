@@ -140,6 +140,7 @@
               <span v-if="routes[dia.key].stops.filter((s:string) => s).length > 0" class="day-chip">
                 {{ routes[dia.key].stops.filter((s:string) => s).length }} paradas
               </span>
+              <span v-if="precio[dia.key]" class="day-chip" style="color:#4caf50">${{ precio[dia.key] }}</span>
             </div>
             <ion-icon :icon="openDias.route[dia.key] ? chevronUpOutline : chevronDownOutline" class="day-chevron" />
           </button>
@@ -153,6 +154,15 @@
                 <button v-if="routes[dia.key].stops.length > 2" class="btn-remove" @click="removeStop(dia.key, Number(i))">
                   <ion-icon :icon="closeOutline" />
                 </button>
+              </div>
+            </div>
+            <div class="precio-row">
+              <span class="precio-label">
+                <ion-icon :icon="cashOutline" /> Precio del viaje
+              </span>
+              <div class="precio-input-wrap">
+                <span class="precio-currency">$</span>
+                <input v-model="precio[dia.key]" type="number" placeholder="0" class="precio-input" min="0" />
               </div>
             </div>
             <div class="day-actions">
@@ -204,7 +214,7 @@ import {
   logOutOutline, cameraOutline, createOutline, checkmarkOutline, checkmarkCircleOutline,
   addOutline, closeOutline, starOutline, carOutline, personOutline,
   mailOutline, schoolOutline, locationOutline, cardOutline, timeOutline,
-  mapOutline, speedometerOutline, chevronUpOutline, chevronDownOutline,
+  mapOutline, speedometerOutline, chevronUpOutline, chevronDownOutline, cashOutline,
   homeOutline, searchOutline, documentTextOutline,
 } from 'ionicons/icons';
 import { useAuthStore } from '@/stores/authStore';
@@ -266,11 +276,14 @@ async function saveSchedule() {
 }
 
 const defaultRoutes = () => Object.fromEntries(dias.map(d => [d.key, { stops: ['', ''] }]));
+const defaultPrecio = () => Object.fromEntries(dias.map(d => [d.key, '']));
+const precio = ref(JSON.parse(localStorage.getItem(k('precio')) || 'null') || defaultPrecio());
 const routes = ref(JSON.parse(localStorage.getItem(k('routes')) || 'null') || defaultRoutes());
 function addStop(diaKey: string) { routes.value[diaKey].stops.splice(routes.value[diaKey].stops.length - 1, 0, ''); }
 function removeStop(diaKey: string, i: number) { routes.value[diaKey].stops.splice(i, 1); }
 async function saveRoutes() {
   localStorage.setItem(k('routes'), JSON.stringify(routes.value));
+  localStorage.setItem(k('precio'), JSON.stringify(precio.value));
   await syncHorarioDB();
 }
 
@@ -282,7 +295,7 @@ async function syncHorarioDB() {
     const res = await fetch('http://localhost:3000/api/horarios', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ schedule: schedule.value, routes: routes.value }),
+      body: JSON.stringify({ schedule: schedule.value, routes: routes.value, precio: precio.value }),
     });
     const data = await res.json();
     console.log('Horario sincronizado:', data);
@@ -306,6 +319,10 @@ async function loadHorarioDB() {
     if (data.routes && Object.keys(data.routes).length > 0) {
       routes.value = { ...defaultRoutes(), ...data.routes };
       localStorage.setItem(k('routes'), JSON.stringify(routes.value));
+    }
+    if (data.precio && Object.keys(data.precio).length > 0) {
+      precio.value = { ...defaultPrecio(), ...data.precio };
+      localStorage.setItem(k('precio'), JSON.stringify(precio.value));
     }
   } catch (e) { console.error('Error cargando horario:', e); }
 }
@@ -454,6 +471,11 @@ function handleLogout() { authStore.logout(); router.replace('/welcome'); }
 .btn-add { background: rgba(139,26,26,0.12); border: 1px solid rgba(139,26,26,0.25); border-radius: 8px; color: #a32020; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; padding: 7px 12px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
 .btn-save-sm { display: flex; align-items: center; gap: 5px; background: #8B1A1A; border: none; border-radius: 8px; color: #ede9e6; font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600; padding: 7px 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(139,26,26,0.3); transition: background 0.3s; }
 .btn-save-sm.saved { background: #1a6b1a; box-shadow: 0 4px 12px rgba(26,107,26,0.3); }
+.precio-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 1px solid rgba(255,255,255,0.05); }
+.precio-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(237,233,230,0.45); font-family: 'DM Sans', sans-serif; }
+.precio-input-wrap { display: flex; align-items: center; gap: 4px; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 6px 10px; }
+.precio-currency { color: #4caf50; font-weight: 700; font-size: 13px; }
+.precio-input { background: transparent; border: none; outline: none; color: #ede9e6; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; width: 70px; text-align: right; }
 
 .schedule-hint { color: rgba(237,233,230,0.3); font-size: 11.5px; padding: 0 16px 12px; font-family: 'DM Sans', sans-serif; }
 

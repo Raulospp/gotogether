@@ -125,6 +125,84 @@
           </div>
         </div>
 
+        <!-- Mis Viajes -->
+        <div class="sec">
+          <div class="sec-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Mis viajes esta semana
+          </div>
+        </div>
+
+        <div v-if="loadingViajes" class="empty-row">
+          <div class="spinner-sm"></div> Cargando...
+        </div>
+        <div v-else-if="viajesPorDia.length === 0" class="empty-row">
+          Sin viajes confirmados esta semana
+        </div>
+
+        <template v-else v-for="grupo in viajesPorDia" :key="grupo.dia">
+          <!-- Separador de día -->
+          <div class="viaje-dia-header" :class="{ pasado: grupo.pasado }">
+            <span class="viaje-dia-label">{{ grupo.diaLabel }}</span>
+            <span v-if="grupo.pasado" class="viaje-dia-tag">Pasado</span>
+            <span v-else-if="grupo.esHoy" class="viaje-dia-tag hoy">Hoy</span>
+          </div>
+        <div v-for="v in grupo.viajes" :key="v.solicitud_id" class="viaje-card" :class="{ pasado: grupo.pasado }" @click="viajeAbierto = viajeAbierto === v.solicitud_id ? null : v.solicitud_id">
+          <!-- Header del viaje -->
+          <div class="viaje-top">
+            <div class="viaje-avatar" :style="`background:${avatarColor(isConductor ? v.pasajero_name : v.conductor_name)}`">
+              {{ initial(isConductor ? v.pasajero_name : v.conductor_name) }}
+            </div>
+            <div class="viaje-info">
+              <div class="viaje-name">{{ isConductor ? v.pasajero_name : v.conductor_name }}</div>
+              <div class="viaje-sub">{{ isConductor ? v.pasajero_university : v.car_model }} · {{ isConductor ? v.pasajero_city : v.conductor_city }}</div>
+            </div>
+            <div class="viaje-right">
+              <div v-if="getPrecioHoy(v, grupo.dia)" class="viaje-precio">${{ getPrecioHoy(v, grupo.dia) }}</div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="viajeAbierto === v.solicitud_id ? 'transform:rotate(180deg)' : ''"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </div>
+
+          <!-- Detalle expandible -->
+          <div v-if="viajeAbierto === v.solicitud_id" class="viaje-detail">
+            <div class="viaje-divider"></div>
+
+            <!-- Horario del día -->
+            <div class="viaje-horario">
+              <div class="viaje-slot" v-if="getHorarioViaje(v, 'ida', grupo.dia)">
+                <span class="slot-dir">↑ Salida</span>
+                <span class="slot-time">{{ getHorarioViaje(v, 'ida', grupo.dia) }}</span>
+              </div>
+              <div class="viaje-slot" v-if="getHorarioViaje(v, 'vuelta', grupo.dia)">
+                <span class="slot-dir">↓ Regreso</span>
+                <span class="slot-time">{{ getHorarioViaje(v, 'vuelta', grupo.dia) }}</span>
+              </div>
+            </div>
+
+            <!-- Ruta -->
+            <div v-if="getRutaViaje(v, grupo.dia).length > 0" class="viaje-ruta">
+              <div v-for="(stop, i) in getRutaViaje(v, grupo.dia)" :key="i" class="viaje-stop">
+                <div class="vstop-dot" :class="i === 0 ? 'start' : i === getRutaViaje(v).length-1 ? 'end' : 'mid'"></div>
+                <span class="vstop-label">{{ stop }}</span>
+              </div>
+            </div>
+
+            <!-- Precio -->
+            <div v-if="getPrecioHoy(v, grupo.dia)" class="viaje-precio-row">
+              <span>Valor del viaje</span>
+              <span class="precio-val">${{ Number(getPrecioHoy(v, grupo.dia)).toLocaleString('es-CO') }}</span>
+            </div>
+
+            <!-- WhatsApp -->
+            <button v-if="(isConductor ? v.pasajero_phone : v.conductor_phone)" class="btn-wpp-viaje"
+              @click.stop="wppViaje(isConductor ? v.pasajero_phone : v.conductor_phone)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.853L0 24l6.335-1.521A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.645-.52-5.148-1.422l-.369-.218-3.763.904.937-3.666-.242-.381A9.96 9.96 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+              Contactar por WhatsApp
+            </button>
+          </div>
+        </div>
+        </template>
+
         <div style="height:20px"></div>
 
       </div>
@@ -221,6 +299,84 @@ const rutaHoy = computed(() => {
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 function getToken() { return localStorage.getItem('token') || ''; }
 
+const loadingViajes = ref(false);
+const viajes = ref<any[]>([]);
+const viajeAbierto = ref<number|null>(null);
+
+async function fetchViajes() {
+  loadingViajes.value = true;
+  try {
+    // Limpiar viajes pasados primero
+    await fetch(`${API}/api/viajes/limpiar-pasados`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getToken()}` }
+    }).catch(() => {});
+
+    const res = await fetch(`${API}/api/viajes/mis-viajes`, {
+      headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (res.ok) viajes.value = await res.json();
+  } catch(e) { console.error(e); }
+  finally { loadingViajes.value = false; }
+}
+
+// Días de la semana ordenados
+const diasSemana = [
+  { key: 'lunes', label: 'Lunes', num: 1 },
+  { key: 'martes', label: 'Martes', num: 2 },
+  { key: 'miercoles', label: 'Miércoles', num: 3 },
+  { key: 'jueves', label: 'Jueves', num: 4 },
+  { key: 'viernes', label: 'Viernes', num: 5 },
+  { key: 'sabado', label: 'Sábado', num: 6 },
+];
+
+const diaNumHoy = now.getDay(); // 0=dom, 1=lun...
+
+// Agrupar viajes por día de la semana
+const viajesPorDia = computed(() => {
+  const grupos: any[] = [];
+  for (const dia of diasSemana) {
+    // Ver qué viajes tienen horario para este día
+    const viajesDelDia = viajes.value.filter(v =>
+      v.schedule?.[dia.key]?.ida || v.schedule?.[dia.key]?.vuelta
+    );
+    if (viajesDelDia.length === 0) continue;
+
+    const pasado = dia.num < diaNumHoy;
+    const esHoy = dia.num === diaNumHoy;
+
+    grupos.push({
+      dia: dia.key,
+      diaLabel: dia.label,
+      pasado,
+      esHoy,
+      viajes: viajesDelDia,
+    });
+  }
+  // Ordenar: hoy primero, luego futuros, pasados al final
+  return [
+    ...grupos.filter(g => g.esHoy),
+    ...grupos.filter(g => !g.esHoy && !g.pasado),
+    ...grupos.filter(g => g.pasado),
+  ];
+});
+
+function getHorarioViaje(v: any, tipo: 'ida'|'vuelta', dia?: string) {
+  const d = dia || diaHoy;
+  return v.schedule?.[d]?.[tipo] || '';
+}
+function getRutaViaje(v: any, dia?: string) {
+  const d = dia || diaHoy;
+  return (v.routes?.[d]?.stops || []).filter(Boolean);
+}
+function getPrecioHoy(v: any, dia?: string) {
+  const d = dia || diaHoy;
+  return v.precio?.[d] || '';
+}
+function wppViaje(phone: string) {
+  if (phone) window.open(`https://wa.me/57${phone}`, '_blank');
+}
+
 async function fetchSolicitudes() {
   loadingSolicitudes.value = true;
   try {
@@ -242,7 +398,7 @@ async function fetchFeed() {
   finally { loadingFeed.value = false; }
 }
 
-onMounted(() => { fetchSolicitudes(); fetchFeed(); fetchPendientesCount(); });
+onMounted(() => { fetchSolicitudes(); fetchFeed(); fetchPendientesCount(); fetchViajes(); });
 
 // ── Computeds ─────────────────────────────────────────────────────────────────
 const solicitudesPendientes = computed(() => solicitudes.value.filter(s => s.estado === 'pendiente'));
@@ -352,6 +508,42 @@ function showToast(msg: string, type: 'success'|'error' = 'success') {
 /* Empty row */
 .empty-row { display: flex; align-items: center; gap: 8px; padding: 12px 20px; font-size: 12px; color: rgba(237,233,230,0.25); font-family: 'DM Sans', sans-serif; }
 .spinner-sm { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(139,26,26,0.2); border-top-color: #8B1A1A; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+
+.viaje-dia-header { display: flex; align-items: center; gap: 8px; padding: 14px 20px 6px; }
+.viaje-dia-label { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; color: rgba(237,233,230,0.5); text-transform: uppercase; letter-spacing: 0.5px; }
+.viaje-dia-tag { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 10px; font-family: 'Outfit', sans-serif; background: rgba(255,255,255,0.06); color: rgba(237,233,230,0.3); }
+.viaje-dia-tag.hoy { background: rgba(139,26,26,0.2); color: #a32020; }
+.viaje-dia-header.pasado .viaje-dia-label { color: rgba(237,233,230,0.25); }
+.viaje-card.pasado { opacity: 0.45; }
+.viaje-card { margin: 0 18px 8px; background: #111111; border: 1px solid rgba(37,211,102,0.2); border-radius: 14px; overflow: hidden; cursor: pointer; position: relative; z-index: 1; transition: border-color 0.2s; }
+.viaje-fecha-bar { display: flex; align-items: center; gap: 6px; padding: 8px 14px 4px; font-size: 10.5px; color: rgba(237,233,230,0.3); border-bottom: 1px solid rgba(255,255,255,0.04); }
+.viaje-dia-badge { font-family: 'Outfit', sans-serif; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.2); color: #25d366; text-transform: uppercase; letter-spacing: 0.5px; }
+.viaje-dia-badge.hoy { background: rgba(139,26,26,0.2); border-color: rgba(139,26,26,0.3); color: #a32020; }
+.viaje-card:active { transform: scale(0.99); }
+.viaje-top { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.viaje-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 800; color: #ede9e6; flex-shrink: 0; }
+.viaje-info { flex: 1; min-width: 0; }
+.viaje-name { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; color: #ede9e6; margin-bottom: 2px; }
+.viaje-sub { font-size: 11px; color: rgba(237,233,230,0.38); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.viaje-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.viaje-precio { background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.2); border-radius: 8px; padding: 3px 8px; font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 700; color: #25d366; }
+.viaje-detail { padding: 0 14px 14px; }
+.viaje-divider { height: 1px; background: rgba(255,255,255,0.06); margin-bottom: 12px; }
+.viaje-horario { display: flex; gap: 10px; margin-bottom: 10px; }
+.viaje-slot { flex: 1; background: rgba(139,26,26,0.1); border: 1px solid rgba(139,26,26,0.2); border-radius: 8px; padding: 8px 10px; text-align: center; }
+.slot-dir { display: block; font-size: 9px; color: rgba(237,233,230,0.35); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+.slot-time { font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; color: #ede9e6; }
+.viaje-ruta { margin-bottom: 10px; }
+.viaje-stop { display: flex; align-items: center; gap: 8px; padding: 4px 0; position: relative; }
+.viaje-stop:not(:last-child)::after { content: ''; position: absolute; left: 5px; top: 16px; width: 2px; height: 12px; background: rgba(139,26,26,0.3); }
+.vstop-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; z-index: 1; }
+.vstop-dot.start { background: #8B1A1A; box-shadow: 0 0 6px rgba(139,26,26,0.5); }
+.vstop-dot.mid { background: rgba(255,255,255,0.15); border: 1.5px solid rgba(255,255,255,0.1); }
+.vstop-dot.end { background: rgba(237,233,230,0.4); }
+.vstop-label { font-size: 12px; color: rgba(237,233,230,0.65); }
+.viaje-precio-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4px; font-size: 12px; color: rgba(237,233,230,0.4); }
+.precio-val { font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: #25d366; }
+.btn-wpp-viaje { width: 100%; margin-top: 10px; padding: 10px; background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.22); border-radius: 10px; color: #25d366; font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Toast */
