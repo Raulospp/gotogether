@@ -470,12 +470,12 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
         FROM solicitudes s
         JOIN users p ON p.id = s.pasajero_id
         LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.conductor_id = $1 AND s.estado = 'aceptada'
+        WHERE s.conductor_id = $1 AND s.estado = 'aceptada' AND s.fecha_viaje = CURRENT_DATE
         ORDER BY s.created_at DESC
       `, [userId]);
     } else {
       result = await pool.query(`
-        SELECT s.id as solicitud_id, s.created_at,
+        SELECT s.id as solicitud_id, s.fecha_viaje, s.created_at,
                c.id as conductor_id, c.name as conductor_name, c.city as conductor_city,
                c.car_model, c.plate, c.vehicle_type, c.phone as conductor_phone,
                COALESCE(h.schedule, '{}') as schedule,
@@ -484,7 +484,7 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
         FROM solicitudes s
         JOIN users c ON c.id = s.conductor_id
         LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.pasajero_id = $1 AND s.estado = 'aceptada'
+        WHERE s.pasajero_id = $1 AND s.estado = 'aceptada' AND s.fecha_viaje = CURRENT_DATE
         ORDER BY s.created_at DESC
       `, [userId]);
     }
