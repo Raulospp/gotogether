@@ -13,6 +13,7 @@ const routes: Array<RouteRecordRaw> = [
   { path: '/feed', component: () => import('@/views/FeedView.vue') },
   { path: '/solicitudes', component: () => import('@/views/SolicitudesView.vue') },
   { path: '/perfil/:role/:id', component: () => import('@/views/PerfilView.vue') },
+  { path: '/viaje/:id', component: () => import('@/views/ViajeView.vue') },
   { path: '/editar-perfil', component: () => import('@/views/EditarPerfilView.vue') },
 ];
 

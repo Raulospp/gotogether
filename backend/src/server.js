@@ -15,7 +15,6 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'cambiame_en_produccion';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Pool de conexiones optimizado
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
@@ -30,7 +29,6 @@ const pool = new Pool({
 app.use(cors());
 app.use(express.json({ limit: '10kb' }));
 
-// Logging simple de peticiones (útil para debug)
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
@@ -40,7 +38,6 @@ app.use((req, res, next) => {
 //  FUNCIONES AUXILIARES
 // ===============================
 async function initDB() {
-  // Usuarios
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id            SERIAL PRIMARY KEY,
@@ -62,13 +59,11 @@ async function initDB() {
     );
   `);
 
-  // Agregar columnas faltantes (si no existen)
   const columns = ['vehicle_type', 'capacity', 'verified', 'verify_token', 'phone'];
   for (const col of columns) {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col} ${col === 'capacity' ? 'INTEGER' : (col === 'verified' ? 'BOOLEAN DEFAULT FALSE' : 'TEXT')}`).catch(() => {});
   }
 
-  // Solicitudes
   await pool.query(`
     CREATE TABLE IF NOT EXISTS solicitudes (
       id            SERIAL PRIMARY KEY,
@@ -80,10 +75,9 @@ async function initDB() {
       created_at    TIMESTAMPTZ DEFAULT NOW()
     );
   `);
-  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS iniciado_por INTEGER REFERENCES users(id) ON DELETE CASCADE`);
-  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS fecha_viaje DATE DEFAULT CURRENT_DATE`);
+  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS iniciado_por INTEGER REFERENCES users(id) ON DELETE CASCADE`).catch(() => {});
+  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS fecha_viaje DATE DEFAULT CURRENT_DATE`).catch(() => {});
 
-  // Horarios
   await pool.query(`
     CREATE TABLE IF NOT EXISTS horarios (
       id        SERIAL PRIMARY KEY,
@@ -94,18 +88,16 @@ async function initDB() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
-  await pool.query(`ALTER TABLE horarios ADD COLUMN IF NOT EXISTS precio JSONB DEFAULT '{}'`);
+  await pool.query(`ALTER TABLE horarios ADD COLUMN IF NOT EXISTS precio JSONB DEFAULT '{}'`).catch(() => {});
 
-  // Índices para mejorar rendimiento
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitudes_estado ON solicitudes(estado);`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitudes_pasajero ON solicitudes(pasajero_id);`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitudes_conductor ON solicitudes(conductor_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitudes_estado ON solicitudes(estado);`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitudes_pasajero ON solicitudes(pasajero_id);`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitudes_conductor ON solicitudes(conductor_id);`).catch(() => {});
 
   console.log('✅ Base de datos lista');
 }
 
-// Middleware de autenticación JWT
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -113,18 +105,14 @@ function authMiddleware(req, res, next) {
   }
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+    req.user = jwt.verify(token, JWT_SECRET);
     next();
   } catch (err) {
-    if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Token expirado' });
-    }
+    if (err.name === 'TokenExpiredError') return res.status(401).json({ message: 'Token expirado' });
     return res.status(401).json({ message: 'Token inválido' });
   }
 }
 
-// Envío de correo de verificación
 async function sendVerificationEmail(email, name, token) {
   const verifyUrl = `http://localhost:${PORT}/api/auth/verify?token=${token}`;
   await resend.emails.send({
@@ -143,15 +131,6 @@ async function sendVerificationEmail(email, name, token) {
     `
   });
 }
-
-// ===============================
-//  MANEJADOR DE ERRORES CENTRALIZADO
-// ===============================
-function errorHandler(err, req, res, next) {
-  console.error('❌ Error:', err);
-  res.status(500).json({ message: 'Error interno del servidor' });
-}
-app.use(errorHandler); // Se coloca al final, después de las rutas
 
 // ===============================
 //  RUTAS DE SALUD
@@ -179,7 +158,6 @@ app.post('/api/auth/register/conductor', async (req, res, next) => {
 
     const hashed = await bcrypt.hash(password, 10);
     const verifyToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
-
     const result = await pool.query(
       `INSERT INTO users (name, email, password, role, city, car_model, plate, route, vehicle_type, capacity, phone, verified, verify_token)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,FALSE,$12)
@@ -205,7 +183,6 @@ app.post('/api/auth/register/pasajero', async (req, res, next) => {
 
     const hashed = await bcrypt.hash(password, 10);
     const verifyToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
-
     const result = await pool.query(
       `INSERT INTO users (name, email, password, role, city, university, route, phone, verified, verify_token)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,FALSE,$9)
@@ -243,11 +220,9 @@ app.post('/api/auth/login', async (req, res, next) => {
     if (!user) return res.status(401).json({ message: 'Credenciales inválidas' });
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ message: 'Credenciales inválidas' });
-    // Verificación desactivada temporalmente
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     res.json({
-      message: 'Login exitoso',
-      token,
+      message: 'Login exitoso', token,
       user: {
         id: user.id, name: user.name, email: user.email, role: user.role,
         city: user.city, university: user.university,
@@ -261,12 +236,42 @@ app.post('/api/auth/login', async (req, res, next) => {
 app.get('/api/auth/me', authMiddleware, async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT id, name, email, role, city, university, car_model, plate, route, vehicle_type, capacity, phone, created_at
-       FROM users WHERE id = $1`,
+      `SELECT id, name, email, role, city, university, car_model, plate, route, vehicle_type, capacity, phone, created_at FROM users WHERE id = $1`,
       [req.user.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Usuario no encontrado' });
     res.json({ user: result.rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ===============================
+//  PERFIL (EDITAR)
+// ===============================
+app.patch('/api/auth/profile', authMiddleware, async (req, res, next) => {
+  try {
+    const { name, city, phone, university, car_model, plate, password } = req.body;
+    const userId = req.user.id;
+    const fields = [];
+    const values = [];
+    let idx = 1;
+    if (name)       { fields.push(`name = $${idx++}`);       values.push(name); }
+    if (city)       { fields.push(`city = $${idx++}`);       values.push(city); }
+    if (phone)      { fields.push(`phone = $${idx++}`);      values.push(phone); }
+    if (university) { fields.push(`university = $${idx++}`); values.push(university); }
+    if (car_model)  { fields.push(`car_model = $${idx++}`);  values.push(car_model); }
+    if (plate)      { fields.push(`plate = $${idx++}`);      values.push(plate); }
+    if (password) {
+      const hashed = await bcrypt.hash(password, 10);
+      fields.push(`password = $${idx++}`);
+      values.push(hashed);
+    }
+    if (fields.length === 0) return res.status(400).json({ message: 'No hay campos para actualizar' });
+    values.push(userId);
+    const result = await pool.query(
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, email, role, city, university, car_model, plate, vehicle_type, capacity, phone`,
+      values
+    );
+    res.json({ message: 'Perfil actualizado', user: result.rows[0] });
   } catch (err) { next(err); }
 });
 
@@ -282,11 +287,12 @@ app.get('/api/users/conductores', authMiddleware, async (req, res, next) => {
              COALESCE(h.precio, '{}') as precio,
              u.capacity - COALESCE(
                (SELECT COUNT(*) FROM solicitudes s
-                WHERE s.conductor_id = u.id AND s.estado = 'aceptada'), 0
+                WHERE s.conductor_id = u.id AND s.estado = 'aceptada' AND s.fecha_viaje = CURRENT_DATE), 0
              ) as cupos_disponibles,
              EXISTS(
                SELECT 1 FROM solicitudes s
-               WHERE s.conductor_id = u.id AND s.pasajero_id = $2 AND s.estado IN ('pendiente','aceptada')
+               WHERE s.conductor_id = u.id AND s.pasajero_id = $2
+               AND s.estado IN ('pendiente','aceptada') AND s.fecha_viaje = CURRENT_DATE
              ) as ya_solicitado
       FROM users u
       LEFT JOIN horarios h ON h.user_id = u.id
@@ -304,7 +310,8 @@ app.get('/api/users/pasajeros', authMiddleware, async (req, res, next) => {
              COALESCE(h.schedule, '{}') as schedule,
              EXISTS(
                SELECT 1 FROM solicitudes s
-               WHERE s.pasajero_id = u.id AND s.conductor_id = $2 AND s.estado IN ('pendiente','aceptada')
+               WHERE s.pasajero_id = u.id AND s.conductor_id = $2
+               AND s.estado IN ('pendiente','aceptada') AND s.fecha_viaje = CURRENT_DATE
              ) as ya_invitado
       FROM users u
       LEFT JOIN horarios h ON h.user_id = u.id
@@ -326,13 +333,16 @@ app.post('/api/solicitudes', authMiddleware, async (req, res, next) => {
 
     if (userRole === 'pasajero') {
       if (!conductor_id) return res.status(400).json({ message: 'conductor_id requerido' });
+      // Solo una solicitud por día al mismo conductor
       const existe = await pool.query(
-        'SELECT id FROM solicitudes WHERE pasajero_id = $1 AND conductor_id = $2 AND estado = $3',
-        [userId, conductor_id, 'pendiente']
+        `SELECT id FROM solicitudes
+         WHERE pasajero_id = $1 AND conductor_id = $2
+         AND estado IN ('pendiente','aceptada') AND fecha_viaje = CURRENT_DATE`,
+        [userId, conductor_id]
       );
-      if (existe.rows.length > 0) return res.status(409).json({ message: 'Ya tienes una solicitud pendiente con este conductor' });
+      if (existe.rows.length > 0) return res.status(409).json({ message: 'Ya tienes una solicitud para hoy con este conductor' });
       const result = await pool.query(
-        'INSERT INTO solicitudes (pasajero_id, conductor_id, iniciado_por) VALUES ($1, $2, $3) RETURNING *',
+        'INSERT INTO solicitudes (pasajero_id, conductor_id, iniciado_por, fecha_viaje) VALUES ($1, $2, $3, CURRENT_DATE) RETURNING *',
         [userId, conductor_id, userId]
       );
       return res.status(201).json({ message: 'Solicitud enviada', solicitud: result.rows[0] });
@@ -340,19 +350,33 @@ app.post('/api/solicitudes', authMiddleware, async (req, res, next) => {
 
     if (userRole === 'conductor') {
       if (!pasajero_id) return res.status(400).json({ message: 'pasajero_id requerido' });
+      // Solo una invitación por día al mismo pasajero
       const existe = await pool.query(
-        'SELECT id FROM solicitudes WHERE pasajero_id = $1 AND conductor_id = $2 AND estado = $3',
-        [pasajero_id, userId, 'pendiente']
+        `SELECT id FROM solicitudes
+         WHERE pasajero_id = $1 AND conductor_id = $2
+         AND estado IN ('pendiente','aceptada') AND fecha_viaje = CURRENT_DATE`,
+        [pasajero_id, userId]
       );
-      if (existe.rows.length > 0) return res.status(409).json({ message: 'Ya enviaste una invitación a este pasajero' });
+      if (existe.rows.length > 0) return res.status(409).json({ message: 'Ya enviaste una invitación a este pasajero hoy' });
       const result = await pool.query(
-        'INSERT INTO solicitudes (pasajero_id, conductor_id, iniciado_por) VALUES ($1, $2, $3) RETURNING *',
+        'INSERT INTO solicitudes (pasajero_id, conductor_id, iniciado_por, fecha_viaje) VALUES ($1, $2, $3, CURRENT_DATE) RETURNING *',
         [pasajero_id, userId, userId]
       );
       return res.status(201).json({ message: 'Invitación enviada', solicitud: result.rows[0] });
     }
 
     res.status(400).json({ message: 'Rol no válido' });
+  } catch (err) { next(err); }
+});
+
+app.get('/api/solicitudes/pendientes-count', authMiddleware, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const result = await pool.query(
+      'SELECT COUNT(*) as count FROM solicitudes WHERE iniciado_por != $1 AND (conductor_id = $1 OR pasajero_id = $1) AND estado = $2',
+      [userId, 'pendiente']
+    );
+    res.json({ count: parseInt(result.rows[0].count) });
   } catch (err) { next(err); }
 });
 
@@ -409,48 +433,6 @@ app.delete('/api/solicitudes/:id', authMiddleware, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-app.get('/api/solicitudes/pendientes-count', authMiddleware, async (req, res, next) => {
-  try {
-    const userId = req.user.id;
-    const result = await pool.query(
-      'SELECT COUNT(*) as count FROM solicitudes WHERE iniciado_por != $1 AND (conductor_id = $1 OR pasajero_id = $1) AND estado = $2',
-      [userId, 'pendiente']
-    );
-    res.json({ count: parseInt(result.rows[0].count) });
-  } catch (err) { next(err); }
-});
-
-// ===============================
-//  PERFIL (EDITAR)
-// ===============================
-app.patch('/api/auth/profile', authMiddleware, async (req, res, next) => {
-  try {
-    const { name, city, phone, university, car_model, plate, password } = req.body;
-    const userId = req.user.id;
-    const fields = [];
-    const values = [];
-    let idx = 1;
-    if (name) { fields.push(`name = $${idx++}`); values.push(name); }
-    if (city) { fields.push(`city = $${idx++}`); values.push(city); }
-    if (phone) { fields.push(`phone = $${idx++}`); values.push(phone); }
-    if (university) { fields.push(`university = $${idx++}`); values.push(university); }
-    if (car_model) { fields.push(`car_model = $${idx++}`); values.push(car_model); }
-    if (plate) { fields.push(`plate = $${idx++}`); values.push(plate); }
-    if (password) {
-      const hashed = await bcrypt.hash(password, 10);
-      fields.push(`password = $${idx++}`);
-      values.push(hashed);
-    }
-    if (fields.length === 0) return res.status(400).json({ message: 'No hay campos para actualizar' });
-    values.push(userId);
-    const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, email, role, city, university, car_model, plate, vehicle_type, capacity, phone`,
-      values
-    );
-    res.json({ message: 'Perfil actualizado', user: result.rows[0] });
-  } catch (err) { next(err); }
-});
-
 // ===============================
 //  MIS VIAJES
 // ===============================
@@ -459,9 +441,11 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
     const userId = req.user.id;
     const userRole = req.user.role;
     let result;
+
     if (userRole === 'conductor') {
+      // Conductor ve los pasajeros que aceptó hoy
       result = await pool.query(`
-        SELECT s.id as solicitud_id, s.created_at,
+        SELECT s.id as solicitud_id, s.fecha_viaje, s.created_at,
                p.id as pasajero_id, p.name as pasajero_name, p.city as pasajero_city,
                p.university as pasajero_university, p.phone as pasajero_phone,
                COALESCE(h.schedule, '{}') as schedule,
@@ -470,12 +454,13 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
         FROM solicitudes s
         JOIN users p ON p.id = s.pasajero_id
         LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.conductor_id = $1 AND s.estado = 'aceptada'
+        WHERE s.conductor_id = $1 AND s.estado = 'aceptada' AND s.fecha_viaje = CURRENT_DATE
         ORDER BY s.created_at DESC
       `, [userId]);
     } else {
+      // Pasajero ve el conductor que lo aceptó hoy
       result = await pool.query(`
-        SELECT s.id as solicitud_id, s.created_at,
+        SELECT s.id as solicitud_id, s.fecha_viaje, s.created_at,
                c.id as conductor_id, c.name as conductor_name, c.city as conductor_city,
                c.car_model, c.plate, c.vehicle_type, c.phone as conductor_phone,
                COALESCE(h.schedule, '{}') as schedule,
@@ -484,17 +469,21 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
         FROM solicitudes s
         JOIN users c ON c.id = s.conductor_id
         LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.pasajero_id = $1 AND s.estado = 'aceptada'
+        WHERE s.pasajero_id = $1 AND s.estado = 'aceptada' AND s.fecha_viaje = CURRENT_DATE
         ORDER BY s.created_at DESC
       `, [userId]);
     }
+
     res.json(result.rows);
   } catch (err) { next(err); }
 });
 
+// Limpiar viajes de días anteriores automáticamente
 app.delete('/api/viajes/limpiar-pasados', authMiddleware, async (req, res, next) => {
   try {
-    const result = await pool.query("DELETE FROM solicitudes WHERE estado = 'aceptada' AND fecha_viaje < CURRENT_DATE RETURNING id");
+    const result = await pool.query(
+      "DELETE FROM solicitudes WHERE estado = 'aceptada' AND fecha_viaje < CURRENT_DATE RETURNING id"
+    );
     res.json({ message: `${result.rowCount} viajes pasados eliminados` });
   } catch (err) { next(err); }
 });
@@ -518,10 +507,21 @@ app.post('/api/horarios', authMiddleware, async (req, res, next) => {
 
 app.get('/api/horarios/me', authMiddleware, async (req, res, next) => {
   try {
-    const result = await pool.query('SELECT schedule, routes, precio FROM horarios WHERE user_id = $1', [req.user.id]);
+    const result = await pool.query(
+      'SELECT schedule, routes, precio FROM horarios WHERE user_id = $1',
+      [req.user.id]
+    );
     if (result.rows.length === 0) return res.json({ schedule: {}, routes: {}, precio: {} });
     res.json(result.rows[0]);
   } catch (err) { next(err); }
+});
+
+// ===============================
+//  MANEJADOR DE ERRORES
+// ===============================
+app.use((err, req, res, next) => {
+  console.error('❌ Error:', err);
+  res.status(500).json({ message: 'Error interno del servidor' });
 });
 
 // ===============================

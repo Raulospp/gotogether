@@ -140,7 +140,7 @@
           Sin viajes confirmados hoy
         </div>
 
-        <div v-else v-for="v in viajesHoy" :key="v.solicitud_id" class="viaje-card" @click="viajeAbierto = viajeAbierto === v.solicitud_id ? null : v.solicitud_id">
+        <div v-else v-for="v in viajesHoy" :key="v.solicitud_id" class="viaje-card" @click="router.push(`/viaje/${v.solicitud_id}`)">
           <!-- Header del viaje -->
           <div class="viaje-top">
             <div class="viaje-avatar" :style="`background:${avatarColor(isConductor ? v.pasajero_name : v.conductor_name)}`">
