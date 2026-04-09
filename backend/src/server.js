@@ -57,6 +57,10 @@ async function initDB() {
       verify_token  TEXT,
       created_at    TIMESTAMPTZ DEFAULT NOW()
     );
+
+    ALTER TABLE solicitudes 
+ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ;
   `);
 
   const columns = ['vehicle_type', 'capacity', 'verified', 'verify_token', 'phone'];
@@ -77,7 +81,9 @@ async function initDB() {
   `);
   await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS iniciado_por INTEGER REFERENCES users(id) ON DELETE CASCADE`).catch(() => {});
   await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS fecha_viaje DATE DEFAULT CURRENT_DATE`).catch(() => {});
-
+  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ`).catch(() => {});
+  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ`).catch(() => {});
+  
   await pool.query(`
     CREATE TABLE IF NOT EXISTS horarios (
       id        SERIAL PRIMARY KEY,
@@ -446,6 +452,7 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
       // Conductor ve los pasajeros que aceptó hoy
       result = await pool.query(`
         SELECT s.id as solicitud_id, s.fecha_viaje, s.created_at,
+               s.estado, s.started_at, s.finished_at,
                p.id as pasajero_id, p.name as pasajero_name, p.city as pasajero_city,
                p.university as pasajero_university, p.phone as pasajero_phone,
                COALESCE(h.schedule, '{}') as schedule,
@@ -461,6 +468,7 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
       // Pasajero ve el conductor que lo aceptó hoy
       result = await pool.query(`
         SELECT s.id as solicitud_id, s.fecha_viaje, s.created_at,
+               s.estado, s.started_at, s.finished_at,
                c.id as conductor_id, c.name as conductor_name, c.city as conductor_city,
                c.car_model, c.plate, c.vehicle_type, c.phone as conductor_phone,
                COALESCE(h.schedule, '{}') as schedule,
@@ -475,6 +483,82 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
     }
 
     res.json(result.rows);
+  } catch (err) { next(err); }
+});
+
+app.patch('/api/viajes/:id/iniciar', authMiddleware, async (req, res, next) => {
+  try {
+    const solicitudId = req.params.id;
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      'SELECT * FROM solicitudes WHERE id = $1',
+      [solicitudId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Solicitud no encontrada' });
+    }
+
+    const viaje = result.rows[0];
+
+    if (viaje.conductor_id !== userId) {
+      return res.status(403).json({ message: 'Solo el conductor puede iniciar el viaje' });
+    }
+
+    if (viaje.estado !== 'aceptada') {
+      return res.status(400).json({ message: 'El viaje no está listo para iniciar' });
+    }
+
+    const updated = await pool.query(
+      `UPDATE solicitudes 
+       SET estado = 'en_curso', started_at = NOW() 
+       WHERE id = $1 
+       RETURNING *`,
+      [solicitudId]
+    );
+
+    res.json({ message: 'Viaje iniciado', viaje: updated.rows[0] });
+
+  } catch (err) { next(err); }
+});
+
+//finalizar viajes
+
+app.patch('/api/viajes/:id/finalizar', authMiddleware, async (req, res, next) => {
+  try {
+    const solicitudId = req.params.id;
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      'SELECT * FROM solicitudes WHERE id = $1',
+      [solicitudId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Viaje no encontrado' });
+    }
+
+    const viaje = result.rows[0];
+
+    if (viaje.conductor_id !== userId) {
+      return res.status(403).json({ message: 'Solo el conductor puede finalizar el viaje' });
+    }
+
+    if (viaje.estado !== 'en_curso') {
+      return res.status(400).json({ message: 'El viaje no está en curso' });
+    }
+
+    const updated = await pool.query(
+      `UPDATE solicitudes 
+       SET estado = 'finalizada', finished_at = NOW() 
+       WHERE id = $1 
+       RETURNING *`,
+      [solicitudId]
+    );
+
+    res.json({ message: 'Viaje finalizado', viaje: updated.rows[0] });
+
   } catch (err) { next(err); }
 });
 
