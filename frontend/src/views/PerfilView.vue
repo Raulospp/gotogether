@@ -171,7 +171,7 @@ const myId = authStore.user?.id;
 const perfil = ref<any>(null);
 const loading = ref(false);
 const yaSolicitado = ref(false);
-const API = 'http://localhost:3000';
+const API = 'https://gotogether-nhuj.onrender.com';
 
 const diasMap: Record<number, string> = {
   0: 'domingo', 1: 'lunes', 2: 'martes', 3: 'miercoles',

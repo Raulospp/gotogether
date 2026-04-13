@@ -113,7 +113,7 @@ const authStore = useAuthStore();
 const user = computed(() => authStore.user);
 const isConductor = computed(() => user.value?.role === 'conductor');
 
-const API = 'http://localhost:3000';
+const API = 'https://gotogether-nhuj.onrender.com';
 
 const form = ref({
   name: user.value?.name || '',

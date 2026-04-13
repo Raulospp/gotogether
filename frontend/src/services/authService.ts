@@ -11,36 +11,41 @@ api.interceptors.request.use((config) => {
 });
 
 export const authService = {
-  async loginConductor(data: {
+  async registerConductor(data: {
     name: string; email: string; password: string; phone?: string;
     city: string; car_model: string; plate: string; route?: string;
     vehicle_type: string; capacity: number;
   }) {
-    const res = await api.post('/auth/register/conductor', data);
-    // Registro no devuelve token — solo guarda el user
-    if (res.data.token) {
+    const res = await api.post('/api/auth/register/conductor', data);
+    // ✅ Solo guarda si el backend devuelve token (puede que requiera login aparte)
+    if (res.data?.token) {
       localStorage.setItem('token', res.data.token);
+    }
+    if (res.data?.user) {
       localStorage.setItem('user', JSON.stringify(res.data.user));
     }
     return res.data;
   },
 
-  async loginPasajero(data: {
+  async registerPasajero(data: {
     name: string; email: string; password: string; phone?: string;
     city: string; university: string; route?: string;
   }) {
-    const res = await api.post('/auth/register/pasajero', data);
-    if (res.data.token) {
+    const res = await api.post('/api/auth/register/pasajero', data);
+    if (res.data?.token) {
       localStorage.setItem('token', res.data.token);
+    }
+    if (res.data?.user) {
       localStorage.setItem('user', JSON.stringify(res.data.user));
     }
     return res.data;
   },
 
   async login(email: string, password: string) {
-    const res = await api.post('/auth/login', { email, password });
+    const res = await api.post('/api/auth/login', { email, password });
+    if (!res.data?.token) throw new Error('El servidor no devolvió token');
     localStorage.setItem('token', res.data.token);
-    localStorage.setItem('user', JSON.stringify(res.data.user));
+    localStorage.setItem('user', JSON.stringify(res.data.user ?? {}));
     return res.data;
   },
 
@@ -54,8 +59,13 @@ export const authService = {
   },
 
   getUser() {
-    const u = localStorage.getItem('user');
-    return u ? JSON.parse(u) : null;
+    try {
+      const u = localStorage.getItem('user');
+      return u && u !== 'undefined' ? JSON.parse(u) : null; // ✅ guarda contra "undefined" literal
+    } catch {
+      localStorage.removeItem('user'); // ✅ limpia dato corrupto
+      return null;
+    }
   },
 };
 

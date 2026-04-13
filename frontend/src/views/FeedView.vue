@@ -229,7 +229,7 @@ const loadingSolicitudes = ref(false);
 const usuarios = ref<any[]>([]);
 const solicitudes = ref<any[]>([]);
 
-const API = 'http://localhost:3000';
+const API = 'https://gotogether-nhuj.onrender.com';
 const pendientesCount = ref(0);
 
 async function fetchPendientesCount() {
