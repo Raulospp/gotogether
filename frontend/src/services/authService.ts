@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'https://gotogether-o7cl.onrender.com';
+const API_URL = 'https://gotogether-nhuj.onrender.com';
 
 const api = axios.create({ baseURL: API_URL });
 
