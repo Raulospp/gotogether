@@ -9,7 +9,7 @@ const { Resend } = require('resend');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const BASE_URL = process.env.BASE_URL || `http://:${PORT}`;
+const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const JWT_SECRET = process.env.JWT_SECRET || 'cambiame_en_produccion';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -125,12 +125,12 @@ async function sendVerificationEmail(email, name, token) {
 // ===============================
 //  HEALTH
 // ===============================
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 // ===============================
 //  AUTH — REGISTRO PASAJERO
 // ===============================
-app.post('/auth/register/pasajero', async (req, res) => {
+app.post('/api/auth/register/pasajero', async (req, res) => {
   try {
     const { name, email, password, city, university, phone, route } = req.body;
     if (!name || !email || !password || !city || !university)
@@ -159,7 +159,7 @@ app.post('/auth/register/pasajero', async (req, res) => {
 // ===============================
 //  AUTH — REGISTRO CONDUCTOR
 // ===============================
-app.post('/auth/register/conductor', async (req, res) => {
+app.post('/api/auth/register/conductor', async (req, res) => {
   try {
     const { name, email, password, city, car_model, plate, vehicle_type, capacity, phone, route } = req.body;
     if (!name || !email || !password || !city || !car_model || !plate || !vehicle_type || !capacity)
@@ -201,7 +201,7 @@ app.get('/api/auth/verify', async (req, res) => {
 // ===============================
 //  AUTH — LOGIN
 // ===============================
-app.post('/auth/login', async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password)
