@@ -573,7 +573,7 @@ app.use((err, req, res, next) => {
 initDB().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Servidor corriendo en ${BASE_URL}:${PORT}`);
-  });
+  }); 
 }).catch(err => {
   console.error('❌ No se pudo inicializar la base de datos:', err.message);
   process.exit(1);
