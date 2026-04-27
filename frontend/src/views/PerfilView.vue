@@ -116,6 +116,20 @@
           </div>
         </div>
 
+        <!-- Mapa (solo si hay ruta con coordenadas) -->
+        <div v-if="isConductor && getCoords()" class="mapa-wrap">
+          <MapaRuta :paradas="getRuta() || []" :coords="getCoords()!" :altura="200" />
+        </div>
+
+        <!-- Punto de recogida (solo pasajero solicitando a conductor) -->
+        <div v-if="myRole === 'pasajero' && isConductor && !yaSolicitado" class="pickup-section">
+          <div class="pickup-title">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Marca tu punto de recogida
+          </div>
+          <MapaPickup @update="(lat, lon) => { pickupLat = lat; pickupLon = lon; }" />
+        </div>
+
         <!-- Acciones -->
         <div class="actions">
           <!-- Ya solicitado -->
@@ -155,6 +169,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import MapaRuta from '@/views/MapaRuta.vue';
+import MapaPickup from '@/views/MapaPickup.vue';
 import { useRouter, useRoute } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { useAuthStore } from '@/stores/authStore';
@@ -171,7 +187,9 @@ const myId = authStore.user?.id;
 const perfil = ref<any>(null);
 const loading = ref(false);
 const yaSolicitado = ref(false);
-const API = 'https://gotogether-nhuj.onrender.com';
+const pickupLat = ref<number|null>(null);
+const pickupLon = ref<number|null>(null);
+const API = 'http://localhost:3000';
 
 const diasMap: Record<number, string> = {
   0: 'domingo', 1: 'lunes', 2: 'martes', 3: 'miercoles',
@@ -227,6 +245,12 @@ function getRuta(): string[] | null {
   return stops.filter(Boolean);
 }
 
+function getCoords(): { lat: number; lon: number }[] | null {
+  const coords = perfil.value?.routes?.[diaHoy]?.coords;
+  if (!coords || coords.length < 2) return null;
+  return coords;
+}
+
 function getPrecio(): string {
   return perfil.value?.precio?.[diaHoy] || '';
 }
@@ -259,7 +283,7 @@ async function enviarSolicitud() {
   if (!perfil.value) return;
   try {
     const body = myRole === 'pasajero'
-      ? { conductor_id: perfil.value.id }
+      ? { conductor_id: perfil.value.id, pickup_lat: pickupLat.value, pickup_lon: pickupLon.value }
       : { pasajero_id: perfil.value.id };
     const res = await fetch(`${API}/api/solicitudes`, {
       method: 'POST',
@@ -333,6 +357,9 @@ async function enviarSolicitud() {
 .btn-full { width: 100%; padding: 15px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; color: rgba(237,233,230,0.25); font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600; cursor: not-allowed; }
 .btn-wpp { width: 100%; padding: 14px; background: rgba(37,211,102,0.12); border: 1px solid rgba(37,211,102,0.25); border-radius: 14px; color: #25d366; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
 
+.pickup-section { margin: 0 18px 12px; background: #111; border: 1px solid rgba(139,26,26,0.2); border-radius: 14px; padding: 14px; position: relative; z-index: 1; }
+.pickup-title { font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 700; color: rgba(237,233,230,0.35); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+.mapa-wrap { margin: 0 18px 12px; border: 1px solid rgba(37,211,102,0.15); border-radius: 16px; overflow: hidden; position: relative; z-index: 1; }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 80px 0; color: rgba(237,233,230,0.25); font-family: 'DM Sans', sans-serif; font-size: 14px; position: relative; z-index: 1; }
 .spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid rgba(139,26,26,0.2); border-top-color: #8B1A1A; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

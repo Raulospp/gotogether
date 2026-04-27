@@ -23,11 +23,9 @@
 
       <template v-else-if="viaje">
 
-        <!-- Mapa placeholder -->
-        <div class="mapa-placeholder">
-          <div class="mapa-grid"></div>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(37,211,102,0.35)" stroke-width="1.5" style="position:relative;z-index:1"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          <div class="mapa-label">Mapa disponible próximamente</div>
+        <!-- Mapa -->
+        <div class="mapa-wrap">
+          <MapaRuta :paradas="ruta" :coords="rutaCoords || undefined" :pickup="pickupCoord || undefined" :altura="200" />
         </div>
 
         <!-- Banner en curso (pasajero) -->
@@ -127,6 +125,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import MapaRuta from '@/views/MapaRuta.vue';
 import { useRouter, useRoute } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { useAuthStore } from '@/stores/authStore';
@@ -195,6 +194,18 @@ const horario = computed(() => ({
 }));
 
 const ruta = computed(() => (viaje.value?.routes?.[diaHoy]?.stops || []).filter(Boolean));
+const pickupCoord = computed(() => {
+  if (!isConductor.value || !viaje.value) return null;
+  const lat = viaje.value.pickup_lat;
+  const lon = viaje.value.pickup_lon;
+  if (!lat || !lon) return null;
+  return { lat: Number(lat), lon: Number(lon) };
+});
+
+const rutaCoords = computed(() => {
+  const coords = viaje.value?.routes?.[diaHoy]?.coords;
+  return coords?.length >= 2 ? coords : null;
+});
 
 const precio = computed(() => viaje.value?.precio?.[diaHoy] || '');
 
@@ -272,9 +283,7 @@ async function cancelarViaje() {
 .en-curso-banner { margin: 0 18px 12px; background: rgba(139,26,26,0.12); border: 1px solid rgba(139,26,26,0.25); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #a32020; font-weight: 600; font-family: 'Outfit', sans-serif; position: relative; z-index: 1; }
 .en-curso-dot { width: 10px; height: 10px; border-radius: 50%; background: #a32020; box-shadow: 0 0 8px rgba(139,26,26,0.6); flex-shrink: 0; animation: pulse 1s ease infinite; }
 
-.mapa-placeholder { margin: 0 18px 14px; height: 170px; background: #0a140a; border: 1px solid rgba(37,211,102,0.15); border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; position: relative; z-index: 1; overflow: hidden; }
-.mapa-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(37,211,102,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(37,211,102,0.04) 1px, transparent 1px); background-size: 28px 28px; }
-.mapa-label { font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600; color: rgba(37,211,102,0.35); letter-spacing: 1px; text-transform: uppercase; position: relative; z-index: 1; }
+.mapa-wrap { margin: 0 18px 14px; border: 1px solid rgba(37,211,102,0.15); border-radius: 18px; overflow: hidden; position: relative; z-index: 1; }
 
 .seccion { padding: 0 18px; margin-bottom: 12px; position: relative; z-index: 1; }
 .sec-title { font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 700; color: rgba(237,233,230,0.35); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }

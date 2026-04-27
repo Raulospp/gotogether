@@ -266,10 +266,11 @@ const dias = [
   { key: 'jueves', label: 'Jueves' },
   { key: 'viernes', label: 'Viernes' },
   { key: 'sabado', label: 'Sábado' },
+  { key: 'domingo', label: 'Domingo' },
 ];
 
 const defaultSchedule = () => Object.fromEntries(dias.map(d => [d.key, { ida: '', vuelta: '' }]));
-const schedule = ref(JSON.parse(localStorage.getItem(k('schedule')) || 'null') || defaultSchedule());
+const schedule = ref({ ...defaultSchedule(), ...(JSON.parse(localStorage.getItem(k('schedule')) || 'null') || {}) });
 async function saveSchedule() {
   localStorage.setItem(k('schedule'), JSON.stringify(schedule.value));
   await syncHorarioDB();
@@ -277,8 +278,8 @@ async function saveSchedule() {
 
 const defaultRoutes = () => Object.fromEntries(dias.map(d => [d.key, { stops: ['', ''] }]));
 const defaultPrecio = () => Object.fromEntries(dias.map(d => [d.key, '']));
-const precio = ref(JSON.parse(localStorage.getItem(k('precio')) || 'null') || defaultPrecio());
-const routes = ref(JSON.parse(localStorage.getItem(k('routes')) || 'null') || defaultRoutes());
+const precio = ref({ ...defaultPrecio(), ...(JSON.parse(localStorage.getItem(k('precio')) || 'null') || {}) });
+const routes = ref({ ...defaultRoutes(), ...(JSON.parse(localStorage.getItem(k('routes')) || 'null') || {}) });
 function addStop(diaKey: string) { routes.value[diaKey].stops.splice(routes.value[diaKey].stops.length - 1, 0, ''); }
 function removeStop(diaKey: string, i: number) { routes.value[diaKey].stops.splice(i, 1); }
 async function saveRoutes() {
@@ -292,7 +293,7 @@ async function syncHorarioDB() {
     const token = localStorage.getItem('token');
     if (!token) { console.warn('syncHorarioDB: no token'); return; }
     console.log('Sincronizando horario...', schedule.value);
-    const res = await fetch('https://gotogether-nhuj.onrender.com/api/horarios', {
+    const res = await fetch('http://localhost:3000/api/horarios', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ schedule: schedule.value, routes: routes.value, precio: precio.value }),
@@ -307,7 +308,7 @@ async function loadHorarioDB() {
   try {
     const token = localStorage.getItem('token');
     if (!token) return;
-    const res = await fetch('https://gotogether-nhuj.onrender.com/api/horarios/me', {
+    const res = await fetch('http://localhost:3000/api/horarios/me', {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) return;
