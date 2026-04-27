@@ -89,6 +89,19 @@ export async function initDB() {
 
   await addColumnIfMissing('horarios', 'precio', "JSONB DEFAULT '{}'");
 
+  // --- Tabla refresh_tokens ---
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+      token      TEXT UNIQUE NOT NULL,
+      device     VARCHAR(200),
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);`);
+
   // --- Índices ---
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_role            ON users(role);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitudes_estado    ON solicitudes(estado);`);
