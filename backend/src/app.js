@@ -5,12 +5,12 @@ import cors          from 'cors';
 import { pool }      from './config/db.js';
 import { waitForDB, initDB } from './utils/db.js';
 
-import authRouter        from './routes/auth.js';
-import usersRouter       from './routes/users.js';
+import authRouter from './routes/auth.js';
+import usersRouter from './routes/users.js';
 import solicitudesRouter from './routes/solicitudes.js';
-import viajesRouter      from './routes/viajes.js';
-import horariosRouter    from './routes/horarios.js';
-
+import viajesRouter from './routes/viajes.js';
+import horariosRouter  from './routes/horarios.js';
+import mapRouter  from './routes/map.js';
 // ===============================
 //  CONFIGURACIÓN
 // ===============================
@@ -44,13 +44,13 @@ app.use('/api/users',       usersRouter);
 app.use('/api/solicitudes', solicitudesRouter);
 app.use('/api/viajes',      viajesRouter);
 app.use('/api/horarios',    horariosRouter);
-
+app.use('/api/map',  mapRouter);
 // ===============================
 //  MANEJADOR DE ERRORES GLOBAL
 // ===============================
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
-  console.error('❌ Error:', err);
+  console.error('Error:', err);
   res.status(500).json({ message: 'Error interno del servidor' });
 });
 
