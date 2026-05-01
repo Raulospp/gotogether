@@ -74,6 +74,9 @@ export async function initDB() {
 
   await addColumnIfMissing('solicitudes', 'iniciado_por', 'INTEGER REFERENCES users(id) ON DELETE CASCADE');
   await addColumnIfMissing('solicitudes', 'fecha_viaje',  'DATE DEFAULT CURRENT_DATE');
+  await addColumnIfMissing('solicitudes', 'pickup_lat',  'DOUBLE PRECISION');
+  await addColumnIfMissing('solicitudes', 'pickup_lon',  'DOUBLE PRECISION');
+  await addColumnIfMissing('solicitudes', 'pickup_name', 'TEXT');
 
   // --- Tabla horarios ---
   await pool.query(`
