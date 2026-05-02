@@ -10,7 +10,7 @@ import usersRouter from './routes/users.js';
 import solicitudesRouter from './routes/solicitudes.js';
 import viajesRouter from './routes/viajes.js';
 import horariosRouter  from './routes/horarios.js';
-import mapRouter  from './routes/map.js';
+import mapRouter  from './routes/maps.js';
 // ===============================
 //  CONFIGURACIÓN
 // ===============================
