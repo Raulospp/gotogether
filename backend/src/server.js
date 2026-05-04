@@ -478,7 +478,7 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
         SELECT s.id as solicitud_id, s.estado, s.fecha_viaje, s.created_at,
                p.id as pasajero_id, p.name as pasajero_name, p.city as pasajero_city,
                p.university as pasajero_university, p.phone as pasajero_phone,
-               s.pickup_lat, s.pickup_lon,
+               s.pickup_lat, s.pickup_lon, s.pickup_direccion,
                COALESCE(h.schedule, '{}') as schedule,
                COALESCE(h.routes, '{}') as routes,
                COALESCE(h.precio, '{}') as precio
@@ -547,6 +547,20 @@ app.get('/api/viajes/:id', authMiddleware, async (req, res, next) => {
 
     if (result.rows.length === 0) return res.status(404).json({ message: 'Viaje no encontrado' });
     res.json(result.rows[0]);
+  } catch (err) { next(err); }
+});
+
+// Actualizar ubicación del pasajero en tiempo real
+app.patch('/api/viajes/:id/ubicacion', authMiddleware, async (req, res, next) => {
+  try {
+    const { lat, lon } = req.body;
+    const solicitudId = req.params.id;
+    const userId = req.user.id;
+    await pool.query(
+      'UPDATE solicitudes SET pickup_lat = $1, pickup_lon = $2 WHERE id = $3 AND pasajero_id = $4',
+      [lat, lon, solicitudId, userId]
+    );
+    res.json({ message: 'Ubicación actualizada' });
   } catch (err) { next(err); }
 });
 

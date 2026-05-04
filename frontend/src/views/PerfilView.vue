@@ -102,32 +102,29 @@
           <div v-else class="no-horario">Sin horario para hoy</div>
         </div>
 
-        <!-- Ruta hoy (conductor) -->
-        <div v-if="isConductor && getRuta()" class="ruta-card">
-          <div class="ruta-title">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
-            Ruta de hoy
-          </div>
-          <div class="stops">
-            <div v-for="(stop, i) in getRuta()" :key="i" class="stop-item">
-              <div class="stop-dot" :class="i === 0 ? 'start' : i === getRuta()!.length - 1 ? 'end' : 'mid'"></div>
-              <span class="stop-label">{{ stop }}</span>
-            </div>
-          </div>
-        </div>
 
-        <!-- Mapa (solo si hay ruta con coordenadas) -->
-        <div v-if="isConductor && getCoords()" class="mapa-wrap">
-          <MapaRuta :paradas="getRuta() || []" :coords="getCoords()!" :altura="200" />
-        </div>
 
-        <!-- Punto de recogida (solo pasajero solicitando a conductor) -->
+
+
+        <!-- Dirección + Universidad (solo pasajero solicitando a conductor) -->
         <div v-if="myRole === 'pasajero' && isConductor && !yaSolicitado" class="pickup-section">
           <div class="pickup-title">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            Marca tu punto de recogida
+            Tu información de viaje
           </div>
-          <MapaPickup @update="(lat, lon) => { pickupLat = lat; pickupLon = lon; }" />
+          <!-- Dirección de recogida -->
+          <div class="pickup-field-label">¿Dónde te recogemos?</div>
+          <div class="pickup-input-row">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <input v-model="pickupDireccion" type="text" placeholder="Ej: Calle 5 # 38-25, Barrio El Ingenio" class="pickup-input" />
+          </div>
+          <!-- Universidad destino -->
+          <div class="pickup-field-label" style="margin-top:8px">¿A qué universidad vas?</div>
+          <div class="pickup-input-row">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+            <input v-model="pickupUniversidad" type="text" placeholder="Ej: Univalle, USC, UAO, Unicatólica..." class="pickup-input" />
+          </div>
+          <p class="pickup-hint">El conductor verá tu ubicación y destino en el mapa</p>
         </div>
 
         <!-- Acciones -->
@@ -169,8 +166,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import MapaRuta from '@/views/MapaRuta.vue';
-import MapaPickup from '@/views/MapaPickup.vue';
+
 import { useRouter, useRoute } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { useAuthStore } from '@/stores/authStore';
@@ -187,8 +183,8 @@ const myId = authStore.user?.id;
 const perfil = ref<any>(null);
 const loading = ref(false);
 const yaSolicitado = ref(false);
-const pickupLat = ref<number|null>(null);
-const pickupLon = ref<number|null>(null);
+const pickupDireccion = ref('');
+const pickupUniversidad = ref('');
 const API = 'http://localhost:3000';
 
 const diasMap: Record<number, string> = {
@@ -282,8 +278,21 @@ function showToast(msg: string, type: 'success' | 'error' = 'success') {
 async function enviarSolicitud() {
   if (!perfil.value) return;
   try {
+    // Geocodificar dirección del pasajero con Google
+    let pickup_lat = null, pickup_lon = null;
+    if (myRole === 'pasajero' && pickupDireccion.value.trim()) {
+      try {
+        const q = encodeURIComponent(`${pickupDireccion.value}, Cali, Colombia`);
+        const gres = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${q}&key=AIzaSyBVta3wPBhLml0Jr87iM8ij5j134BMeqqo`);
+        const gdata = await gres.json();
+        if (gdata.status === 'OK') {
+          pickup_lat = gdata.results[0].geometry.location.lat;
+          pickup_lon = gdata.results[0].geometry.location.lng;
+        }
+      } catch { /* sin coords */ }
+    }
     const body = myRole === 'pasajero'
-      ? { conductor_id: perfil.value.id, pickup_lat: pickupLat.value, pickup_lon: pickupLon.value }
+      ? { conductor_id: perfil.value.id, pickup_lat, pickup_lon }
       : { pasajero_id: perfil.value.id };
     const res = await fetch(`${API}/api/solicitudes`, {
       method: 'POST',
@@ -359,6 +368,17 @@ async function enviarSolicitud() {
 
 .pickup-section { margin: 0 18px 12px; background: #111; border: 1px solid rgba(139,26,26,0.2); border-radius: 14px; padding: 14px; position: relative; z-index: 1; }
 .pickup-title { font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 700; color: rgba(237,233,230,0.35); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+.pickup-input-row { display: flex; align-items: center; gap: 10px; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px; }
+.pickup-input-row:focus-within { border-color: rgba(139,26,26,0.4); }
+.pickup-input-row svg { color: rgba(237,233,230,0.25); flex-shrink: 0; }
+.pickup-input { background: transparent; border: none; outline: none; color: #ede9e6; font-family: 'DM Sans', sans-serif; font-size: 13px; width: 100%; }
+.pickup-input::placeholder { color: rgba(237,233,230,0.2); font-size: 12px; }
+.pickup-hint { font-size: 10px; color: rgba(237,233,230,0.25); font-family: 'DM Sans', sans-serif; margin-top: 6px; font-style: italic; }
+.pickup-input-row { display: flex; align-items: center; gap: 10px; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px; }
+.pickup-input-row svg { color: #a32020; flex-shrink: 0; }
+.pickup-input { background: transparent; border: none; outline: none; color: #ede9e6; font-family: 'DM Sans', sans-serif; font-size: 13px; width: 100%; }
+.pickup-input::placeholder { color: rgba(237,233,230,0.25); }
+.pickup-hint { font-size: 10px; color: rgba(237,233,230,0.25); font-family: 'DM Sans', sans-serif; margin-top: 6px; }
 .mapa-wrap { margin: 0 18px 12px; border: 1px solid rgba(37,211,102,0.15); border-radius: 16px; overflow: hidden; position: relative; z-index: 1; }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 80px 0; color: rgba(237,233,230,0.25); font-family: 'DM Sans', sans-serif; font-size: 14px; position: relative; z-index: 1; }
 .spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid rgba(139,26,26,0.2); border-top-color: #8B1A1A; animation: spin 0.8s linear infinite; }

@@ -156,6 +156,8 @@
                 </button>
               </div>
             </div>
+
+
             <div class="precio-row">
               <span class="precio-label">
                 <ion-icon :icon="cashOutline" /> Precio del viaje
@@ -276,7 +278,7 @@ async function saveSchedule() {
   await syncHorarioDB();
 }
 
-const defaultRoutes = () => Object.fromEntries(dias.map(d => [d.key, { stops: ['', ''] }]));
+const defaultRoutes = () => Object.fromEntries(dias.map(d => [d.key, { stops: ['', ''], coords: [] }]));
 const defaultPrecio = () => Object.fromEntries(dias.map(d => [d.key, '']));
 const precio = ref({ ...defaultPrecio(), ...(JSON.parse(localStorage.getItem(k('precio')) || 'null') || {}) });
 const routes = ref({ ...defaultRoutes(), ...(JSON.parse(localStorage.getItem(k('routes')) || 'null') || {}) });
