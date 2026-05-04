@@ -138,6 +138,7 @@ const solicitudId = Number(route.params.id);
 const API = 'http://localhost:3000';
 const loading = ref(true);
 const viaje = ref<any>(null);
+
 let pollingInterval: any = null;
 
 function getToken() { return localStorage.getItem('token') || ''; }
@@ -147,12 +148,16 @@ const diaHoy = diasMap[new Date().getDay()];
 
 async function fetchViaje() {
   try {
+    // Carga el viaje específico (para estado, info conductor/pasajero, etc.)
     const res = await fetch(`${API}/api/viajes/${solicitudId}`, {
       headers: { Authorization: `Bearer ${getToken()}` }
     });
     if (res.status === 404) { router.replace('/inicio'); return; }
     if (!res.ok) return;
     viaje.value = await res.json();
+
+    // El servidor ya devuelve viaje.pasajeros para el conductor (array completo)
+    // No necesitamos una segunda llamada a mis-viajes
   } catch(e) { console.error(e); }
   finally { loading.value = false; }
 }
@@ -163,28 +168,40 @@ onMounted(() => {
 });
 onUnmounted(() => { if (pollingInterval) clearInterval(pollingInterval); });
 
-// Pasajeros con sus pickups (para conductor)
+// FIX: pasajeros usa todosLosPasajeros cuando es conductor
 const pasajeros = computed(() => {
   if (!isConductor.value || !viaje.value) return [];
-  if (viaje.value.pasajeros) return viaje.value.pasajeros;
-  return [{
-    solicitud_id: viaje.value.solicitud_id,
-    pasajero_name: viaje.value.pasajero_name,
-    pasajero_phone: viaje.value.pasajero_phone,
-    pickup_lat: viaje.value.pickup_lat,
-    pickup_lon: viaje.value.pickup_lon,
-    pickup_direccion: viaje.value.pickup_direccion,
-  }];
+  // Formato nuevo: servidor devuelve viaje.pasajeros como array
+  if (Array.isArray(viaje.value.pasajeros) && viaje.value.pasajeros.length > 0) {
+    return viaje.value.pasajeros;
+  }
+  // Formato actual: servidor devuelve fila plana con pasajero_name etc. en la raíz
+  if (viaje.value.pasajero_name) {
+    return [{
+      solicitud_id:       viaje.value.solicitud_id,
+      pasajero_id:        viaje.value.pasajero_id,
+      pasajero_name:      viaje.value.pasajero_name,
+      pasajero_phone:     viaje.value.pasajero_phone,
+      pickup_lat:         viaje.value.pickup_lat,
+      pickup_lon:         viaje.value.pickup_lon,
+      pickup_direccion:   viaje.value.pickup_direccion,
+      pickup_universidad: viaje.value.pickup_universidad,
+      destino_lat:        viaje.value.destino_lat,
+      destino_lon:        viaje.value.destino_lon,
+    }];
+  }
+  return [];
 });
 
+// FIX: incluir destino_lat, destino_lon, pickup_universidad que antes faltaban
 const todosPickups = computed(() => pasajeros.value.map((p: any) => ({
-  lat: p.pickup_lat ? Number(p.pickup_lat) : null,
-  lon: p.pickup_lon ? Number(p.pickup_lon) : null,
-  destino_lat: p.destino_lat ? Number(p.destino_lat) : null,
-  destino_lon: p.destino_lon ? Number(p.destino_lon) : null,
-  direccion: p.pickup_direccion || '',
-  universidad: p.pickup_universidad || '',
-  nombre: p.pasajero_name,
+  lat:          p.pickup_lat       ? Number(p.pickup_lat)   : null,
+  lon:          p.pickup_lon       ? Number(p.pickup_lon)   : null,
+  destino_lat:  p.destino_lat      ? Number(p.destino_lat)  : null,
+  destino_lon:  p.destino_lon      ? Number(p.destino_lon)  : null,
+  direccion:    p.pickup_direccion  || '',
+  universidad:  p.pickup_universidad || '',
+  nombre:       p.pasajero_name,
 })));
 
 const telefonoOtro = computed(() => {
@@ -213,21 +230,30 @@ function showToast(msg: string, type: 'success'|'error' = 'success') {
 // Cuando el pasajero comparte su ubicación
 async function onUbicacionCompartida(data: { lat: number; lon: number; direccion: string; universidad: string; destino_lat: number; destino_lon: number }) {
   try {
-    await fetch(`${API}/api/solicitudes/${solicitudId}/pickup`, {
+    const res = await fetch(`${API}/api/solicitudes/${solicitudId}/pickup`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
       body: JSON.stringify({
-        pickup_lat: data.lat,
-        pickup_lon: data.lon,
-        pickup_direccion: data.direccion,
+        pickup_lat:        data.lat,
+        pickup_lon:        data.lon,
+        pickup_direccion:  data.direccion,
         pickup_universidad: data.universidad,
-        destino_lat: data.destino_lat,
-        destino_lon: data.destino_lon,
+        destino_lat:       data.destino_lat,
+        destino_lon:       data.destino_lon,
       }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('[pickup] error:', res.status, err);
+      showToast('Error al guardar ubicación', 'error');
+      return;
+    }
     showToast('Ubicación compartida con el conductor', 'success');
     await fetchViaje();
-  } catch { showToast('Error al compartir ubicación', 'error'); }
+  } catch(e) {
+    console.error('[pickup] excepcion:', e);
+    showToast('Error al compartir ubicación', 'error');
+  }
 }
 
 async function iniciarViaje() {

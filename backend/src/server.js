@@ -7,6 +7,9 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const { Resend } = require('resend');
 
+// fetch: nativo en Node 18+, fallback para versiones anteriores
+const fetch = globalThis.fetch ?? require('node-fetch');
+
 // ===============================
 //  CONFIGURACIÓN
 // ===============================
@@ -77,6 +80,12 @@ async function initDB() {
   `);
   await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS iniciado_por INTEGER REFERENCES users(id) ON DELETE CASCADE`).catch(() => {});
   await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS fecha_viaje DATE DEFAULT CURRENT_DATE`).catch(() => {});
+  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS pickup_lat DOUBLE PRECISION`).catch(() => {});
+  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS pickup_lon DOUBLE PRECISION`).catch(() => {});
+  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS pickup_direccion TEXT`).catch(() => {});
+  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS pickup_universidad TEXT`).catch(() => {});
+  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS destino_lat DOUBLE PRECISION`).catch(() => {});
+  await pool.query(`ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS destino_lon DOUBLE PRECISION`).catch(() => {});
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS horarios (
@@ -137,6 +146,66 @@ async function sendVerificationEmail(email, name, token) {
 // ===============================
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ===============================
+//  GEOCODING PROXY
+//  Evita restricciones de HTTP referrer de la API key en el frontend.
+//  El servidor llama a Google sin restricción de dominio.
+// ===============================
+const GKEY = process.env.GOOGLE_MAPS_KEY || 'AIzaSyBVta3wPBhLml0Jr87iM8ij5j134BMeqqo';
+const CALI_BOUNDS = '3.3,-76.6|3.6,-76.4';
+
+async function geocodeQuery(q) {
+  const url =
+    `https://maps.googleapis.com/maps/api/geocode/json` +
+    `?address=${encodeURIComponent(q)}` +
+    `&key=${GKEY}` +
+    `&language=es` +
+    `&region=co` +
+    `&bounds=${CALI_BOUNDS}`;
+  const r = await fetch(url);
+  return r.json();
+}
+
+app.get('/api/geocode', authMiddleware, async (req, res, next) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.status(400).json({ message: 'Parámetro q requerido' });
+
+    // Normalizar: quitar "#" que confunde al geocoder colombiano
+    const normalizado = q.replace(/#\s*/g, '').replace(/\s{2,}/g, ' ').trim();
+
+    // Intento 1: completo + Valle del Cauca
+    let d = await geocodeQuery(`${normalizado}, Cali, Valle del Cauca, Colombia`);
+    if (d.status === 'OK') {
+      const loc = d.results[0].geometry.location;
+      return res.json({ lat: loc.lat, lon: loc.lng, formatted: d.results[0].formatted_address });
+    }
+
+    // Intento 2: sin número de puerta ("-XX")
+    const sinPuerta = normalizado.replace(/-\d+(\s*)$/, '').trim();
+    if (sinPuerta !== normalizado) {
+      d = await geocodeQuery(`${sinPuerta}, Cali, Valle del Cauca, Colombia`);
+      if (d.status === 'OK') {
+        const loc = d.results[0].geometry.location;
+        return res.json({ lat: loc.lat, lon: loc.lng, formatted: d.results[0].formatted_address });
+      }
+    }
+
+    // Intento 3: solo la vía
+    const soloVia = normalizado.replace(/\s+\d[\d\s\-]*$/, '').trim();
+    if (soloVia && soloVia !== normalizado) {
+      d = await geocodeQuery(`${soloVia}, Cali, Colombia`);
+      if (d.status === 'OK') {
+        const loc = d.results[0].geometry.location;
+        return res.json({ lat: loc.lat, lon: loc.lng, formatted: d.results[0].formatted_address });
+      }
+    }
+
+    // Sin resultados
+    res.status(404).json({ message: 'No encontrado', status: d.status });
+  } catch (err) { next(err); }
 });
 
 // ===============================
@@ -400,6 +469,27 @@ app.get('/api/solicitudes/mis-solicitudes', authMiddleware, async (req, res, nex
   } catch (err) { next(err); }
 });
 
+// FIX: alias para el endpoint que llama el frontend actual
+app.patch('/api/solicitudes/:id/pickup', authMiddleware, async (req, res, next) => {
+  req.params.id = req.params.id; // reuse handler
+  const { pickup_lat, pickup_lon, pickup_direccion, pickup_universidad, destino_lat, destino_lon } = req.body;
+  try {
+    const solicitudId = req.params.id;
+    const userId = req.user.id;
+    await pool.query(
+      `UPDATE solicitudes
+       SET pickup_lat = $1, pickup_lon = $2,
+           pickup_direccion = COALESCE($3, pickup_direccion),
+           pickup_universidad = COALESCE($4, pickup_universidad),
+           destino_lat = COALESCE($5, destino_lat),
+           destino_lon = COALESCE($6, destino_lon)
+       WHERE id = $7 AND pasajero_id = $8`,
+      [pickup_lat, pickup_lon, pickup_direccion, pickup_universidad, destino_lat, destino_lon, solicitudId, userId]
+    );
+    res.json({ message: 'Ubicación actualizada' });
+  } catch (err) { next(err); }
+});
+
 app.patch('/api/solicitudes/:id', authMiddleware, async (req, res, next) => {
   try {
     const { estado } = req.body;
@@ -479,6 +569,7 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
                p.id as pasajero_id, p.name as pasajero_name, p.city as pasajero_city,
                p.university as pasajero_university, p.phone as pasajero_phone,
                s.pickup_lat, s.pickup_lon, s.pickup_direccion,
+               s.pickup_universidad, s.destino_lat, s.destino_lon,
                COALESCE(h.schedule, '{}') as schedule,
                COALESCE(h.routes, '{}') as routes,
                COALESCE(h.precio, '{}') as precio
@@ -518,18 +609,41 @@ app.get('/api/viajes/:id', authMiddleware, async (req, res, next) => {
 
     let result;
     if (userRole === 'conductor') {
+      // FIX: el conductor puede tener varios pasajeros.
+      // Buscamos TODOS los pasajeros activos del conductor hoy.
+      // El :id se usa para identificar al conductor indirectamente
+      // (cualquier solicitud suya del día nos da el conductor_id = userId).
       result = await pool.query(`
         SELECT s.id as solicitud_id, s.estado, s.fecha_viaje, s.created_at,
                p.id as pasajero_id, p.name as pasajero_name, p.city as pasajero_city,
                p.university as pasajero_university, p.phone as pasajero_phone,
+               s.pickup_lat, s.pickup_lon, s.pickup_direccion,
+               s.pickup_universidad, s.destino_lat, s.destino_lon,
                COALESCE(h.schedule, '{}') as schedule,
                COALESCE(h.routes, '{}') as routes,
                COALESCE(h.precio, '{}') as precio
         FROM solicitudes s
         JOIN users p ON p.id = s.pasajero_id
         LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.id = $1 AND s.conductor_id = $2
+        WHERE s.conductor_id = $2
+          AND s.estado IN ('aceptada','en_curso')
+          AND s.fecha_viaje = CURRENT_DATE
+        ORDER BY s.created_at ASC
       `, [solicitudId, userId]);
+
+      if (result.rows.length === 0) return res.status(404).json({ message: 'Viaje no encontrado' });
+
+      // Devolver la primera fila como base del viaje + todos los pasajeros como array
+      const base = result.rows[0];
+      return res.json({
+        solicitud_id: base.solicitud_id,
+        estado:       base.estado,
+        fecha_viaje:  base.fecha_viaje,
+        schedule:     base.schedule,
+        routes:       base.routes,
+        precio:       base.precio,
+        pasajeros:    result.rows,   // <-- array completo para el mapa
+      });
     } else {
       result = await pool.query(`
         SELECT s.id as solicitud_id, s.estado, s.fecha_viaje, s.created_at,
@@ -550,15 +664,26 @@ app.get('/api/viajes/:id', authMiddleware, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Actualizar ubicación del pasajero en tiempo real
+// Actualizar ubicación del pasajero (pickup + destino universidad)
+// FIX: acepta todos los campos y también responde en /api/solicitudes/:id/pickup
+//      para mantener compatibilidad con versiones anteriores del frontend
 app.patch('/api/viajes/:id/ubicacion', authMiddleware, async (req, res, next) => {
   try {
-    const { lat, lon } = req.body;
+    const { lat, lon, pickup_lat, pickup_lon, pickup_direccion, pickup_universidad, destino_lat, destino_lon } = req.body;
     const solicitudId = req.params.id;
     const userId = req.user.id;
+    // Soportar tanto { lat, lon } como { pickup_lat, pickup_lon }
+    const pLat = pickup_lat ?? lat;
+    const pLon = pickup_lon ?? lon;
     await pool.query(
-      'UPDATE solicitudes SET pickup_lat = $1, pickup_lon = $2 WHERE id = $3 AND pasajero_id = $4',
-      [lat, lon, solicitudId, userId]
+      `UPDATE solicitudes
+       SET pickup_lat = $1, pickup_lon = $2,
+           pickup_direccion = COALESCE($3, pickup_direccion),
+           pickup_universidad = COALESCE($4, pickup_universidad),
+           destino_lat = COALESCE($5, destino_lat),
+           destino_lon = COALESCE($6, destino_lon)
+       WHERE id = $7 AND pasajero_id = $8`,
+      [pLat, pLon, pickup_direccion, pickup_universidad, destino_lat, destino_lon, solicitudId, userId]
     );
     res.json({ message: 'Ubicación actualizada' });
   } catch (err) { next(err); }
