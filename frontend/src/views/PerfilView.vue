@@ -106,25 +106,13 @@
 
 
 
-        <!-- Dirección + Universidad (solo pasajero solicitando a conductor) -->
-        <div v-if="myRole === 'pasajero' && isConductor && !yaSolicitado" class="pickup-section">
-          <div class="pickup-title">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            Tu información de viaje
-          </div>
-          <!-- Dirección de recogida -->
-          <div class="pickup-field-label">¿Dónde te recogemos?</div>
-          <div class="pickup-input-row">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <input v-model="pickupDireccion" type="text" placeholder="Ej: Calle 5 # 38-25, Barrio El Ingenio" class="pickup-input" />
-          </div>
-          <!-- Universidad destino -->
-          <div class="pickup-field-label" style="margin-top:8px">¿A qué universidad vas?</div>
-          <div class="pickup-input-row">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-            <input v-model="pickupUniversidad" type="text" placeholder="Ej: Univalle, USC, UAO, Unicatólica..." class="pickup-input" />
-          </div>
-          <p class="pickup-hint">El conductor verá tu ubicación y destino en el mapa</p>
+        <!-- Mapa de recogida (solo pasajero solicitando a conductor) -->
+        <div v-if="myRole === 'pasajero' && isConductor && !yaSolicitado" class="mapa-perfil-wrap">
+          <MapaViaje
+            :mi-solicitud-id="-1"
+            :altura="200"
+            @ubicacion-compartida="onUbicacionLista"
+          />
         </div>
 
         <!-- Acciones -->
@@ -143,7 +131,7 @@
             Sin horario para hoy
           </button>
           <!-- Normal -->
-          <button v-else class="btn-primary" @click="enviarSolicitud()">
+          <button v-else class="btn-primary" @click="enviarSolicitud()" :disabled="myRole === 'pasajero' && isConductor && !ubicacionLista">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             {{ myRole === 'pasajero' ? 'Solicitar cupo' : 'Invitar a viajar' }}
             <span v-if="isConductor && getPrecio()" class="btn-precio">· ${{ Number(getPrecio()).toLocaleString('es-CO') }}</span>
@@ -170,6 +158,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { useAuthStore } from '@/stores/authStore';
+import MapaViaje from '@/views/MapaViaje.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -183,8 +172,8 @@ const myId = authStore.user?.id;
 const perfil = ref<any>(null);
 const loading = ref(false);
 const yaSolicitado = ref(false);
-const pickupDireccion = ref('');
-const pickupUniversidad = ref('');
+const ubicacionLista = ref(false);
+let ubicacionData: any = null;
 const API = 'http://localhost:3000';
 
 const diasMap: Record<number, string> = {
@@ -275,25 +264,21 @@ function showToast(msg: string, type: 'success' | 'error' = 'success') {
   setTimeout(() => { toast.value.show = false; }, 2500);
 }
 
+// Llamado por MapaViaje cuando el pasajero confirma dirección y ve la ruta
+function onUbicacionLista(data: any) {
+  ubicacionData = data;
+  ubicacionLista.value = true;
+  // Disparar automáticamente la solicitud
+  enviarSolicitud();
+}
+
 async function enviarSolicitud() {
   if (!perfil.value) return;
   try {
-    // Geocodificar dirección del pasajero con Google
-    let pickup_lat = null, pickup_lon = null;
-    if (myRole === 'pasajero' && pickupDireccion.value.trim()) {
-      try {
-        const q = encodeURIComponent(`${pickupDireccion.value}, Cali, Colombia`);
-        const gres = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${q}&key=AIzaSyBVta3wPBhLml0Jr87iM8ij5j134BMeqqo`);
-        const gdata = await gres.json();
-        if (gdata.status === 'OK') {
-          pickup_lat = gdata.results[0].geometry.location.lat;
-          pickup_lon = gdata.results[0].geometry.location.lng;
-        }
-      } catch { /* sin coords */ }
-    }
     const body = myRole === 'pasajero'
-      ? { conductor_id: perfil.value.id, pickup_lat, pickup_lon }
+      ? { conductor_id: perfil.value.id }
       : { pasajero_id: perfil.value.id };
+
     const res = await fetch(`${API}/api/solicitudes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
@@ -301,6 +286,23 @@ async function enviarSolicitud() {
     });
     const data = await res.json();
     if (!res.ok) { showToast(data.message || 'Error', 'error'); return; }
+
+    // Si es pasajero y tiene ubicación del mapa, guardarla
+    if (myRole === 'pasajero' && ubicacionData) {
+      await fetch(`${API}/api/solicitudes/${data.solicitud.id}/pickup`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({
+          pickup_lat:         ubicacionData.lat,
+          pickup_lon:         ubicacionData.lon,
+          pickup_direccion:   ubicacionData.direccion,
+          pickup_universidad: ubicacionData.universidad,
+          destino_lat:        ubicacionData.destino_lat,
+          destino_lon:        ubicacionData.destino_lon,
+        }),
+      });
+    }
+
     yaSolicitado.value = true;
     showToast(myRole === 'pasajero' ? '¡Cupo solicitado!' : '¡Invitación enviada!', 'success');
   } catch {
@@ -380,6 +382,7 @@ async function enviarSolicitud() {
 .pickup-input::placeholder { color: rgba(237,233,230,0.25); }
 .pickup-hint { font-size: 10px; color: rgba(237,233,230,0.25); font-family: 'DM Sans', sans-serif; margin-top: 6px; }
 .mapa-wrap { margin: 0 18px 12px; border: 1px solid rgba(37,211,102,0.15); border-radius: 16px; overflow: hidden; position: relative; z-index: 1; }
+.mapa-perfil-wrap { margin: 0 18px 12px; border: 1px solid rgba(139,26,26,0.2); border-radius: 16px; overflow: hidden; position: relative; z-index: 1; }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 80px 0; color: rgba(237,233,230,0.25); font-family: 'DM Sans', sans-serif; font-size: 14px; position: relative; z-index: 1; }
 .spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid rgba(139,26,26,0.2); border-top-color: #8B1A1A; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

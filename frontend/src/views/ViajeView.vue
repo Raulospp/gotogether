@@ -12,7 +12,7 @@
         <span class="top-title">Viaje de hoy</span>
         <div v-if="viaje" class="estado-pill" :class="`estado-${viaje.estado}`">
           <div class="estado-dot"></div>
-          {{ viaje.estado === 'en_curso' ? 'En curso' : 'Confirmado' }}
+          {{ viaje.estado === 'en_curso' ? 'En curso' : viaje.estado === 'pendiente' ? 'Pendiente' : 'Confirmado' }}
         </div>
       </div>
 
@@ -31,6 +31,12 @@
             :altura="220"
             @ubicacion-compartida="onUbicacionCompartida"
           />
+        </div>
+
+        <!-- Banner pendiente (pasajero esperando confirmación) -->
+        <div v-if="!isConductor && viaje.estado === 'pendiente'" class="pendiente-banner">
+          <div class="pendiente-dot"></div>
+          Solicitud enviada — esperando que el conductor acepte
         </div>
 
         <!-- Banner en curso (pasajero) -->
@@ -152,8 +158,36 @@ async function fetchViaje() {
     const res = await fetch(`${API}/api/viajes/${solicitudId}`, {
       headers: { Authorization: `Bearer ${getToken()}` }
     });
-    if (res.status === 404) { router.replace('/inicio'); return; }
-    if (!res.ok) return;
+    if (!res.ok) {
+      // Para el conductor: intentar cargar directamente sus viajes del día
+      if (isConductor.value) {
+        const resMis = await fetch(`${API}/api/viajes/mis-viajes`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        });
+        if (resMis.ok) {
+          const mis = await resMis.json();
+          if (mis.length > 0) {
+            // Construir objeto viaje con todos los pasajeros
+            viaje.value = {
+              solicitud_id: mis[0].solicitud_id,
+              estado: mis[0].estado,
+              fecha_viaje: mis[0].fecha_viaje,
+              schedule: mis[0].schedule,
+              routes: mis[0].routes,
+              precio: mis[0].precio,
+              pasajeros: mis,
+            };
+          } else {
+            router.replace('/inicio');
+          }
+        } else {
+          router.replace('/inicio');
+        }
+        return;
+      }
+      if (res.status === 404) { router.replace('/inicio'); return; }
+      return;
+    }
     viaje.value = await res.json();
 
     // El servidor ya devuelve viaje.pasajeros para el conductor (array completo)
@@ -281,6 +315,7 @@ async function cancelarViaje() {
 .back-btn { width: 36px; height: 36px; background: #171717; border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: rgba(237,233,230,0.6); cursor: pointer; }
 .top-title { font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; color: #ede9e6; }
 .estado-pill { border-radius: 20px; padding: 4px 10px; font-size: 10px; font-weight: 700; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 5px; }
+.estado-pendiente { background: rgba(201,162,39,0.1); border: 1px solid rgba(201,162,39,0.25); color: #c9a227; }
 .estado-aceptada { background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.25); color: #25d366; }
 .estado-en_curso { background: rgba(139,26,26,0.14); border: 1px solid rgba(139,26,26,0.28); color: #a32020; }
 .estado-dot { width: 6px; height: 6px; border-radius: 50%; animation: pulse 1.5s ease infinite; }
@@ -288,6 +323,8 @@ async function cancelarViaje() {
 .estado-en_curso .estado-dot { background: #a32020; }
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 .mapa-wrap { margin: 0 18px 14px; border: 1px solid rgba(37,211,102,0.15); border-radius: 16px; overflow: hidden; position: relative; z-index: 1; }
+.pendiente-banner { margin: 0 18px 12px; background: rgba(201,162,39,0.1); border: 1px solid rgba(201,162,39,0.22); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #c9a227; font-weight: 600; font-family: 'Outfit', sans-serif; position: relative; z-index: 1; }
+.pendiente-dot { width: 10px; height: 10px; border-radius: 50%; background: #c9a227; flex-shrink: 0; animation: pulse 1s ease infinite; }
 .en-curso-banner { margin: 0 18px 12px; background: rgba(139,26,26,0.12); border: 1px solid rgba(139,26,26,0.25); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #a32020; font-weight: 600; font-family: 'Outfit', sans-serif; position: relative; z-index: 1; }
 .en-curso-dot { width: 10px; height: 10px; border-radius: 50%; background: #a32020; flex-shrink: 0; animation: pulse 1s ease infinite; }
 .pasajeros-list { margin: 0 18px 12px; background: #111; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; overflow: hidden; position: relative; z-index: 1; }

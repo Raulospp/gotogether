@@ -52,7 +52,7 @@
       >
         <svg v-if="!enviando" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
         <div v-else class="spin-sm"></div>
-        {{ enviando ? 'Guardando...' : 'Confirmar y enviar al conductor' }}
+        {{ enviando ? 'Guardando...' : (miSolicitudId === -1 ? 'Confirmar dirección' : 'Confirmar y enviar al conductor') }}
       </button>
     </div>
 
@@ -174,7 +174,23 @@ const estiloOscuro = [
 ];
 
 function mkIcon(G: any, color: string, size: number, border: string) {
-  return { path: G.SymbolPath.CIRCLE, scale: size, fillColor: color, fillOpacity: 1, strokeColor: border, strokeWeight: 3 };
+  return { path: G.SymbolPath.CIRCLE, scale: size, fillColor: color, fillOpacity: 1, strokeColor: border, strokeWeight: 2.5 };
+}
+
+// Pin con sombra para marcadores importantes
+function mkPin(color: string, label: string): any {
+  return {
+    url: `data:image/svg+xml;utf8,${encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
+        <filter id="s"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.35"/></filter>
+        <path filter="url(#s)" d="M18 2C10.27 2 4 8.27 4 16c0 10 14 26 14 26s14-16 14-26C32 8.27 25.73 2 18 2z" fill="${color}"/>
+        <circle cx="18" cy="16" r="7" fill="white" opacity="0.25"/>
+        <text x="18" y="21" text-anchor="middle" font-size="13" font-weight="bold" fill="white" font-family="sans-serif">${label}</text>
+      </svg>
+    `)}`,
+    scaledSize: { width: 36, height: 44, equals: () => false },
+    anchor: { x: 18, y: 44, equals: () => false },
+  };
 }
 
 // ── Limpiar mapa ──────────────────────────────────────────────────────────────
@@ -218,7 +234,16 @@ function trazarRuta(
 
   rutaRenderer = new G.DirectionsRenderer({
     suppressMarkers: true,
-    polylineOptions: { strokeColor: '#8B1A1A', strokeWeight: 4, strokeOpacity: 0.9 },
+    polylineOptions: {
+      strokeColor: '#a32020',
+      strokeWeight: 5,
+      strokeOpacity: 0.85,
+      icons: [{
+        icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+        offset: '0',
+        repeat: '16px',
+      }],
+    },
   });
   rutaRenderer.setMap(map);
 
@@ -248,22 +273,33 @@ function dibujar() {
   const bounds = new G.LatLngBounds();
 
   puntos.forEach((p: any) => {
-    // Marcador amarillo = punto de recogida
+    // Pin rojo = punto de recogida del pasajero
     const m1 = new G.Marker({
       position: { lat: Number(p.lat), lng: Number(p.lon) }, map,
-      icon: mkIcon(G, '#ffcc00', 10, '#111'),
+      icon: mkPin('#e53935', '📍'),
       title: `${p.nombre || 'Pasajero'} — recogida`,
+      animation: G.Animation.DROP,
     });
+    // Info window al tocar
+    const iw1 = new G.InfoWindow({
+      content: `<div style="font-family:sans-serif;font-size:12px;color:#111;padding:2px 4px"><b>${p.nombre || 'Pasajero'}</b><br>${p.direccion || ''}</div>`,
+    });
+    m1.addListener('click', () => iw1.open(map, m1));
     marcadores.push(m1);
     bounds.extend({ lat: Number(p.lat), lng: Number(p.lon) });
 
-    // Marcador verde = universidad destino
+    // Pin verde = universidad destino
     if (p.destino_lat && p.destino_lon) {
       const m2 = new G.Marker({
         position: { lat: Number(p.destino_lat), lng: Number(p.destino_lon) }, map,
-        icon: mkIcon(G, '#25d366', 10, '#111'),
+        icon: mkPin('#25d366', '🎓'),
         title: `${p.universidad || 'Destino'}`,
+        animation: G.Animation.DROP,
       });
+      const iw2 = new G.InfoWindow({
+        content: `<div style="font-family:sans-serif;font-size:12px;color:#111;padding:2px 4px"><b>${p.universidad || 'Destino'}</b></div>`,
+      });
+      m2.addListener('click', () => iw2.open(map, m2));
       marcadores.push(m2);
       bounds.extend({ lat: Number(p.destino_lat), lng: Number(p.destino_lon) });
     }
@@ -313,19 +349,31 @@ async function previsualizarRuta() {
 
   limpiarMapa();
 
-  // Marcador amarillo = recogida
-  marcadores.push(new G.Marker({
+  // Pin rojo = punto de recogida
+  const mPickup = new G.Marker({
     position: { lat: pickup.lat, lng: pickup.lon }, map,
-    icon: mkIcon(G, '#ffcc00', 10, '#111'),
+    icon: mkPin('#e53935', '📍'),
     title: 'Tu punto de recogida',
-  }));
+    animation: G.Animation.DROP,
+  });
+  const iwPickup = new G.InfoWindow({
+    content: `<div style="font-family:sans-serif;font-size:12px;color:#111;padding:2px 4px"><b>Tu recogida</b><br>${direccion.value}</div>`,
+  });
+  mPickup.addListener('click', () => iwPickup.open(map, mPickup));
+  marcadores.push(mPickup);
 
-  // Marcador verde = universidad
-  marcadores.push(new G.Marker({
+  // Pin verde = universidad
+  const mDest = new G.Marker({
     position: { lat: destino.lat, lng: destino.lon }, map,
-    icon: mkIcon(G, '#25d366', 10, '#111'),
+    icon: mkPin('#25d366', '🎓'),
     title: universidad.value,
-  }));
+    animation: G.Animation.DROP,
+  });
+  const iwDest = new G.InfoWindow({
+    content: `<div style="font-family:sans-serif;font-size:12px;color:#111;padding:2px 4px"><b>${universidad.value}</b></div>`,
+  });
+  mDest.addListener('click', () => iwDest.open(map, mDest));
+  marcadores.push(mDest);
 
   const bounds = new G.LatLngBounds();
   bounds.extend({ lat: pickup.lat, lng: pickup.lon });
@@ -403,8 +451,10 @@ async function init() {
       if (miMarcador) miMarcador.setMap(null);
       miMarcador = new G.Marker({
         position: me, map,
-        icon: mkIcon(G, '#4a90d9', 9, '#fff'),
+        icon: mkPin('#4a90d9', '🚗'),
         title: 'Tu ubicación',
+        animation: G.Animation.DROP,
+        zIndex: 999,
       });
       dibujar();
     }, () => dibujar(), { enableHighAccuracy: true });

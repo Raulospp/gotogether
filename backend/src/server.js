@@ -21,9 +21,14 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 20,
+  max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000,  // 10s — suficiente para Render free tier
+});
+
+// Reconectar automáticamente si la DB cae
+pool.on('error', (err) => {
+  console.error('⚠️  Pool error (reconectando):', err.message);
 });
 
 // ===============================
@@ -41,6 +46,10 @@ app.use((req, res, next) => {
 //  FUNCIONES AUXILIARES
 // ===============================
 async function initDB() {
+  // Verificar conexión antes de crear tablas
+  const client = await pool.connect();
+  client.release();
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id            SERIAL PRIMARY KEY,
@@ -105,6 +114,22 @@ async function initDB() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitudes_conductor ON solicitudes(conductor_id);`).catch(() => {});
 
   console.log('✅ Base de datos lista');
+}
+
+// Reintentar initDB con backoff exponencial
+async function initDBWithRetry(maxAttempts = 8) {
+  for (let i = 1; i <= maxAttempts; i++) {
+    try {
+      await initDB();
+      return;
+    } catch (err) {
+      const wait = Math.min(1000 * 2 ** i, 30000); // 2s, 4s, 8s... máx 30s
+      console.error(`❌ DB intento ${i}/${maxAttempts} falló: ${err.message}`);
+      if (i === maxAttempts) throw err;
+      console.log(`⏳ Reintentando en ${wait/1000}s...`);
+      await new Promise(r => setTimeout(r, wait));
+    }
+  }
 }
 
 function authMiddleware(req, res, next) {
@@ -455,6 +480,8 @@ app.get('/api/solicitudes/mis-solicitudes', authMiddleware, async (req, res, nex
     const result = await pool.query(`
       SELECT s.id, s.estado, s.created_at, s.iniciado_por,
              s.pasajero_id, s.conductor_id,
+             s.pickup_lat, s.pickup_lon, s.pickup_direccion,
+             s.pickup_universidad, s.destino_lat, s.destino_lon,
              p.name as pasajero_name, p.city as pasajero_city,
              p.university as pasajero_university, p.phone as pasajero_phone,
              c.name as conductor_name, c.city as conductor_city,
@@ -483,7 +510,7 @@ app.patch('/api/solicitudes/:id/pickup', authMiddleware, async (req, res, next) 
            pickup_universidad = COALESCE($4, pickup_universidad),
            destino_lat = COALESCE($5, destino_lat),
            destino_lon = COALESCE($6, destino_lon)
-       WHERE id = $7 AND pasajero_id = $8`,
+       WHERE id = $7::integer AND pasajero_id = $8::integer`,
       [pickup_lat, pickup_lon, pickup_direccion, pickup_universidad, destino_lat, destino_lon, solicitudId, userId]
     );
     res.json({ message: 'Ubicación actualizada' });
@@ -576,7 +603,7 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
         FROM solicitudes s
         JOIN users p ON p.id = s.pasajero_id
         LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.conductor_id = $1 AND s.estado IN ('aceptada','en_curso') AND s.fecha_viaje = CURRENT_DATE
+        WHERE s.conductor_id = $1::integer AND s.estado IN ('aceptada','en_curso') AND s.fecha_viaje = CURRENT_DATE
         ORDER BY s.created_at DESC
       `, [userId]);
     } else {
@@ -591,7 +618,7 @@ app.get('/api/viajes/mis-viajes', authMiddleware, async (req, res, next) => {
         FROM solicitudes s
         JOIN users c ON c.id = s.conductor_id
         LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.pasajero_id = $1 AND s.estado IN ('aceptada','en_curso') AND s.fecha_viaje = CURRENT_DATE
+        WHERE s.pasajero_id = $1 AND s.estado IN ('pendiente','aceptada','en_curso') AND s.fecha_viaje = CURRENT_DATE
         ORDER BY s.created_at DESC
       `, [userId]);
     }
@@ -625,11 +652,11 @@ app.get('/api/viajes/:id', authMiddleware, async (req, res, next) => {
         FROM solicitudes s
         JOIN users p ON p.id = s.pasajero_id
         LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.conductor_id = $2
+        WHERE s.conductor_id = $1::integer
           AND s.estado IN ('aceptada','en_curso')
           AND s.fecha_viaje = CURRENT_DATE
         ORDER BY s.created_at ASC
-      `, [solicitudId, userId]);
+      `, [userId]);
 
       if (result.rows.length === 0) return res.status(404).json({ message: 'Viaje no encontrado' });
 
@@ -655,7 +682,7 @@ app.get('/api/viajes/:id', authMiddleware, async (req, res, next) => {
         FROM solicitudes s
         JOIN users c ON c.id = s.conductor_id
         LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.id = $1 AND s.pasajero_id = $2
+        WHERE s.id = $1::integer AND s.pasajero_id = $2::integer
       `, [solicitudId, userId]);
     }
 
@@ -682,7 +709,7 @@ app.patch('/api/viajes/:id/ubicacion', authMiddleware, async (req, res, next) =>
            pickup_universidad = COALESCE($4, pickup_universidad),
            destino_lat = COALESCE($5, destino_lat),
            destino_lon = COALESCE($6, destino_lon)
-       WHERE id = $7 AND pasajero_id = $8`,
+       WHERE id = $7::integer AND pasajero_id = $8::integer`,
       [pLat, pLon, pickup_direccion, pickup_universidad, destino_lat, destino_lon, solicitudId, userId]
     );
     res.json({ message: 'Ubicación actualizada' });
@@ -738,13 +765,14 @@ app.use((err, req, res, next) => {
 // ===============================
 //  INICIO DEL SERVIDOR
 // ===============================
-initDB()
+// Arrancar con reintentos — esencial para Render free tier (cold start ~30s)
+initDBWithRetry()
   .then(() => {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
     });
   })
   .catch(err => {
-    console.error('❌ Error conectando a la base de datos:', err.message);
+    console.error('❌ No se pudo conectar a la DB tras varios intentos:', err.message);
     process.exit(1);
   });
