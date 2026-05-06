@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = 'https://gotogether-nhuj.onrender.com';
+// ✅ URL correcta de Render (la que funciona en /health)
+const API_URL = 'https://gotogether-api.onrender.com';
 
 const api = axios.create({ baseURL: API_URL });
 
@@ -17,13 +18,8 @@ export const authService = {
     vehicle_type: string; capacity: number;
   }) {
     const res = await api.post('/api/auth/register/conductor', data);
-    // ✅ Solo guarda si el backend devuelve token (puede que requiera login aparte)
-    if (res.data?.token) {
-      localStorage.setItem('token', res.data.token);
-    }
-    if (res.data?.user) {
-      localStorage.setItem('user', JSON.stringify(res.data.user));
-    }
+    if (res.data?.token) localStorage.setItem('token', res.data.token);
+    if (res.data?.user) localStorage.setItem('user', JSON.stringify(res.data.user));
     return res.data;
   },
 
@@ -32,12 +28,8 @@ export const authService = {
     city: string; university: string; route?: string;
   }) {
     const res = await api.post('/api/auth/register/pasajero', data);
-    if (res.data?.token) {
-      localStorage.setItem('token', res.data.token);
-    }
-    if (res.data?.user) {
-      localStorage.setItem('user', JSON.stringify(res.data.user));
-    }
+    if (res.data?.token) localStorage.setItem('token', res.data.token);
+    if (res.data?.user) localStorage.setItem('user', JSON.stringify(res.data.user));
     return res.data;
   },
 
@@ -61,9 +53,9 @@ export const authService = {
   getUser() {
     try {
       const u = localStorage.getItem('user');
-      return u && u !== 'undefined' ? JSON.parse(u) : null; // ✅ guarda contra "undefined" literal
+      return u && u !== 'undefined' ? JSON.parse(u) : null;
     } catch {
-      localStorage.removeItem('user'); // ✅ limpia dato corrupto
+      localStorage.removeItem('user');
       return null;
     }
   },
