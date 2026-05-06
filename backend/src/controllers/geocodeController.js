@@ -6,14 +6,15 @@ exports.geocode = async (req, res, next) => {
     if (!q) {
       return res.status(400).json({ message: 'Parámetro q requerido' });
     }
-    console.log('[geocode] Consulta:', q);
+    console.log('[geocode] Consulta recibida en backend:', q);
     const result = await geocodeAddress(q);
     if (!result) {
       return res.status(404).json({ message: 'No se pudo geocodificar la dirección' });
     }
     res.json(result);
   } catch (err) {
-    console.error('[geocode] Error interno:', err);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    // *****MEJORA: Mostramos el error real en los logs*****
+    console.error('[geocode] ERROR INTERNO EN EL CONTROLADOR:', err.message);
+    res.status(500).json({ message: 'Error interno del servidor', detalleTecnico: err.message });
   }
 };
