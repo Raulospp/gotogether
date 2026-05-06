@@ -206,6 +206,33 @@
         </button>
       </div>
 
+      <!-- Modal de ubicación: se abre cuando el pasajero presiona "Solicitar cupo" -->
+      <div v-if="modalSolicitud" class="modal-overlay" @click.self="modalSolicitud = null">
+        <div class="modal-box">
+          <div class="modal-header">
+            <div class="modal-title">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              ¿Dónde te recogemos?
+            </div>
+            <div class="modal-sub">Conductor: <b>{{ modalSolicitud.name }}</b></div>
+            <button class="modal-close" @click="modalSolicitud = null">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="modal-mapa">
+            <MapaViaje
+              :mi-solicitud-id="-1"
+              :altura="200"
+              @ubicacion-compartida="onUbicacionModal"
+            />
+          </div>
+          <div v-if="enviandoSolicitud" class="modal-sending">
+            <div class="spinner"></div>
+            Enviando solicitud...
+          </div>
+        </div>
+      </div>
+
     </ion-content>
   </ion-page>
 </template>
@@ -215,6 +242,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { useAuthStore } from '@/stores/authStore';
+import MapaViaje from '@/views/MapaViaje.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -230,6 +258,10 @@ const usuarios = ref<any[]>([]);
 const solicitudes = ref<any[]>([]);
 
 const API = 'https://gotogether-nhuj.onrender.com';
+
+// Modal de ubicación al solicitar cupo
+const modalSolicitud = ref<any>(null);   // conductor seleccionado
+const enviandoSolicitud = ref(false);
 const pendientesCount = ref(0);
 
 async function fetchPendientesCount() {
@@ -360,7 +392,17 @@ function verPerfil(u: any) {
   router.push(`/perfil/${role}/${u.id}`);
 }
 
-async function enviarSolicitud(u: any) {
+function enviarSolicitud(u: any) {
+  if (isConductor.value) {
+    // Conductor no necesita modal, envía directo
+    enviarSolicitudDirecta(u);
+  } else {
+    // Pasajero: abrir modal para ingresar dirección antes de solicitar
+    modalSolicitud.value = u;
+  }
+}
+
+async function enviarSolicitudDirecta(u: any) {
   try {
     const body = isConductor.value ? { pasajero_id: u.id } : { conductor_id: u.id };
     const res = await fetch(`${API}/api/solicitudes`, {
@@ -370,9 +412,55 @@ async function enviarSolicitud(u: any) {
     });
     const data = await res.json();
     if (!res.ok) { showToast(data.message || 'Error al enviar', 'error'); return; }
-    showToast(isConductor.value ? `¡Invitación enviada a ${u.name}!` : `¡Cupo solicitado a ${u.name}!`, 'success');
+    showToast(`¡Invitación enviada a ${u.name}!`, 'success');
+    u.ya_invitado = true;
   } catch {
     showToast('Error al enviar solicitud', 'error');
+  }
+}
+
+// Cuando el pasajero confirma su ubicación en el modal
+async function onUbicacionModal(data: {
+  lat: number; lon: number; direccion: string;
+  universidad: string; destino_lat: number; destino_lon: number
+}) {
+  if (!modalSolicitud.value) return;
+  enviandoSolicitud.value = true;
+  try {
+    const conductor = modalSolicitud.value;
+
+    // 1. Crear la solicitud
+    const resSol = await fetch(`${API}/api/solicitudes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify({ conductor_id: conductor.id }),
+    });
+    const dataSol = await resSol.json();
+    if (!resSol.ok) { showToast(dataSol.message || 'Error al solicitar', 'error'); return; }
+
+    const solicitudId = dataSol.solicitud.id;
+
+    // 2. Guardar la ubicación inmediatamente
+    await fetch(`${API}/api/solicitudes/${solicitudId}/pickup`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify({
+        pickup_lat:         data.lat,
+        pickup_lon:         data.lon,
+        pickup_direccion:   data.direccion,
+        pickup_universidad: data.universidad,
+        destino_lat:        data.destino_lat,
+        destino_lon:        data.destino_lon,
+      }),
+    });
+
+    showToast(`¡Cupo solicitado a ${conductor.name}!`, 'success');
+    conductor.ya_solicitado = true;
+    modalSolicitud.value = null;
+  } catch {
+    showToast('Error al enviar solicitud', 'error');
+  } finally {
+    enviandoSolicitud.value = false;
   }
 }
 
@@ -604,4 +692,50 @@ async function responderSolicitud(id: number, estado: string) {
 .nav-item.active { color: #a32020; }
 .nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #a32020; margin-top: -2px; }
 .nav-badge { position: absolute; top: 2px; right: 14px; background: #a32020; color: #ede9e6; border-radius: 10px; font-size: 8px; font-weight: 700; padding: 1px 5px; min-width: 14px; text-align: center; }
+
+/* Modal de ubicación */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(6px);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 0;
+}
+.modal-box {
+  background: #111; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px 20px 0 0;
+  width: 100%; max-width: 480px;
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+  animation: slideUp 0.28s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.modal-header {
+  padding: 18px 18px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  position: relative;
+}
+.modal-title {
+  display: flex; align-items: center; gap: 7px;
+  font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700;
+  color: #ede9e6; margin-bottom: 3px;
+}
+.modal-sub {
+  font-size: 11px; color: rgba(237,233,230,0.4);
+  font-family: 'DM Sans', sans-serif;
+}
+.modal-close {
+  position: absolute; top: 14px; right: 14px;
+  background: rgba(255,255,255,0.07); border: none; border-radius: 50%;
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  color: rgba(237,233,230,0.5); cursor: pointer;
+}
+.modal-mapa { padding: 12px 14px; }
+.modal-sending {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 12px; font-family: 'DM Sans', sans-serif; font-size: 13px;
+  color: rgba(237,233,230,0.5);
+}
+
 </style>
