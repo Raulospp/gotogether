@@ -174,7 +174,7 @@ const loading = ref(false);
 const yaSolicitado = ref(false);
 const ubicacionLista = ref(false);
 let ubicacionData: any = null;
-const API = 'http://localhost:3000';
+const API = 'https://gotogether-api.onrender.com';
 
 const diasMap: Record<number, string> = {
   0: 'domingo', 1: 'lunes', 2: 'martes', 3: 'miercoles',

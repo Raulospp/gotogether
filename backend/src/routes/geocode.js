@@ -1,8 +1,9 @@
 const express = require('express');
-const router = express.Router();
-const geocodeController = require('../controllers/geocodeController');
+const { geocode } = require('../controllers/geocodeController');
 const authMiddleware = require('../middleware/auth');
 
-router.get('/', authMiddleware, geocodeController.geocode);
+const router = express.Router();
+
+router.get('/', authMiddleware, geocode);
 
 module.exports = router;

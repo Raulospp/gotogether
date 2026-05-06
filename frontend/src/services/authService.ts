@@ -1,15 +1,40 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
-// ✅ URL correcta de Render (la que funciona en /health)
+// URL correcta del backend en Render
 const API_URL = 'https://gotogether-api.onrender.com';
 
-const api = axios.create({ baseURL: API_URL });
+// Instancia base de axios (se exporta para usar en otros componentes)
+export const api = axios.create({ baseURL: API_URL });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+// Interceptor para agregar el token a cada petición
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log(`[Auth] Token enviado a ${config.url}`, token.substring(0, 20) + '...');
+    } else {
+      console.warn(`[Auth] No hay token para ${config.url}`);
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Interceptor para manejar errores 401 globalmente
+api.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      console.error('[Auth] Error 401 - Token inválido o expirado');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      // Si usas Vue Router, puedes redirigir:
+      // router.push('/login');
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const authService = {
   async registerConductor(data: {
@@ -17,37 +42,63 @@ export const authService = {
     city: string; car_model: string; plate: string; route?: string;
     vehicle_type: string; capacity: number;
   }) {
-    const res = await api.post('/api/auth/register/conductor', data);
-    if (res.data?.token) localStorage.setItem('token', res.data.token);
-    if (res.data?.user) localStorage.setItem('user', JSON.stringify(res.data.user));
-    return res.data;
+    try {
+      const res = await api.post('/api/auth/register/conductor', data);
+      if (res.data?.token) {
+        localStorage.setItem('token', res.data.token);
+        console.log('[Auth] Token guardado tras registro conductor');
+      }
+      if (res.data?.user) localStorage.setItem('user', JSON.stringify(res.data.user));
+      return res.data;
+    } catch (error) {
+      console.error('[Auth] Error en registro conductor:', error);
+      throw error;
+    }
   },
 
   async registerPasajero(data: {
     name: string; email: string; password: string; phone?: string;
     city: string; university: string; route?: string;
   }) {
-    const res = await api.post('/api/auth/register/pasajero', data);
-    if (res.data?.token) localStorage.setItem('token', res.data.token);
-    if (res.data?.user) localStorage.setItem('user', JSON.stringify(res.data.user));
-    return res.data;
+    try {
+      const res = await api.post('/api/auth/register/pasajero', data);
+      if (res.data?.token) {
+        localStorage.setItem('token', res.data.token);
+        console.log('[Auth] Token guardado tras registro pasajero');
+      }
+      if (res.data?.user) localStorage.setItem('user', JSON.stringify(res.data.user));
+      return res.data;
+    } catch (error) {
+      console.error('[Auth] Error en registro pasajero:', error);
+      throw error;
+    }
   },
 
   async login(email: string, password: string) {
-    const res = await api.post('/api/auth/login', { email, password });
-    if (!res.data?.token) throw new Error('El servidor no devolvió token');
-    localStorage.setItem('token', res.data.token);
-    localStorage.setItem('user', JSON.stringify(res.data.user ?? {}));
-    return res.data;
+    try {
+      const res = await api.post('/api/auth/login', { email, password });
+      if (!res.data?.token) throw new Error('El servidor no devolvió token');
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user ?? {}));
+      console.log('[Auth] Login exitoso, token guardado');
+      return res.data;
+    } catch (error) {
+      console.error('[Auth] Error en login:', error);
+      throw error;
+    }
   },
 
   logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    console.log('[Auth] Sesión cerrada');
   },
 
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('token');
+    const token = localStorage.getItem('token');
+    const isValid = !!token;
+    console.log(`[Auth] isAuthenticated: ${isValid}`);
+    return isValid;
   },
 
   getUser() {
@@ -59,6 +110,11 @@ export const authService = {
       return null;
     }
   },
+
+  // Método para obtener el token actual (depuración)
+  getToken(): string | null {
+    return localStorage.getItem('token');
+  }
 };
 
 export default authService;

@@ -257,7 +257,7 @@ const loadingSolicitudes = ref(false);
 const usuarios = ref<any[]>([]);
 const solicitudes = ref<any[]>([]);
 
-const API = 'https://gotogether-nhuj.onrender.com';
+const API = 'https://gotogether-api.onrender.com';
 
 // Modal de ubicación al solicitar cupo
 const modalSolicitud = ref<any>(null);   // conductor seleccionado

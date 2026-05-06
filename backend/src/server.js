@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const config = require('./config');        // ← ahora contiene { pool, PORT, ... }
+const config = require('./config');        // ← contiene { pool, PORT, ... }
 const errorHandler = require('./middleware/errorHandler');
 
 // Rutas
