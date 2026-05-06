@@ -1,3 +1,46 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const config = require('./config');        // ← ahora contiene { pool, PORT, ... }
+const errorHandler = require('./middleware/errorHandler');
+
+// Rutas
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const solicitudRoutes = require('./routes/solicitudes');
+const viajeRoutes = require('./routes/viajes');
+const horarioRoutes = require('./routes/horarios');
+const geocodeRoutes = require('./routes/geocode');
+
+const app = express();
+
+// Middlewares globales
+app.use(cors());
+app.use(express.json({ limit: '10kb' }));
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Rutas
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/solicitudes', solicitudRoutes);
+app.use('/api/viajes', viajeRoutes);
+app.use('/api/horarios', horarioRoutes);
+app.use('/api/geocode', geocodeRoutes);
+
+// Manejador de errores (siempre al final)
+app.use(errorHandler);
+
+// ========================
+// FUNCIÓN INITDB COMPLETA
+// ========================
 async function initDB() {
   const client = await config.pool.connect();
   client.release();
@@ -78,3 +121,18 @@ async function initDB() {
 
   console.log('✅ Base de datos verificada/creada');
 }
+
+// Iniciar servidor con reintentos
+async function startServer() {
+  try {
+    await initDB();
+    app.listen(config.PORT, '0.0.0.0', () => {
+      console.log(`🚀 Servidor corriendo en http://localhost:${config.PORT}`);
+    });
+  } catch (err) {
+    console.error('❌ Error al iniciar:', err.message);
+    process.exit(1);
+  }
+}
+
+startServer();
