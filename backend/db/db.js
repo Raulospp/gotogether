@@ -13,4 +13,4 @@ pool.on('error', (err) => {
   console.error('⚠️ Pool error (reconectando):', err.message);
 });
 
-module.exports = pool;
+module.exports = pool; 
