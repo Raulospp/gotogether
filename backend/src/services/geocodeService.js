@@ -1,13 +1,12 @@
 const config = require('../config');
 
-// *****MODIFICACIÓN CLAVE: Usar la versión require de node-fetch@2*****
+// Usar node-fetch@2 (compatible con require) – asegúrate de instalarlo con npm install node-fetch@2
 const fetch = require('node-fetch');
 
 const GKEY = config.GOOGLE_MAPS_KEY;
 const CALI_BOUNDS = config.CALI_BOUNDS;
 
 async function geocodeQuery(q) {
-  // *****MEJORA: Verificamos que la API key esté presente*****
   if (!GKEY) {
     throw new Error('No se ha configurado la variable de entorno GOOGLE_MAPS_KEY.');
   }
