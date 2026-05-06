@@ -1,4 +1,5 @@
-const pool = require('../../db/db');
+// backend/src/controllers/viajeController.js
+const { pool } = require('../config'); // ✅ Corregido: usa la conexión desde config
 
 exports.iniciarViaje = async (req, res, next) => {
   try {
@@ -152,4 +153,4 @@ exports.limpiarViajesPasados = async (req, res, next) => {
     );
     res.json({ message: `${result.rowCount} viajes pasados eliminados` });
   } catch (err) { next(err); }
-};
+};  
