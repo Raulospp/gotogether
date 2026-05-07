@@ -47,6 +47,28 @@ const router = Router();
 // Convierte dirección texto en coordenadas.
 // Body: { "address": "Universidad del Norte, Barranquilla" }
 // Respuesta: { lat, lon, displayName }
+router.get('/compat-geocode', async (req, res, next) => {
+  try {
+    const q = req.query.q;
+
+    if (!q) {
+      return res.status(400).json({
+        message: 'query q requerida'
+      });
+    }
+
+    const result = await getCoordinates(q);
+
+    return res.json({
+      lat: result.lat,
+      lon: result.lon,
+      displayName: result.displayName || q
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/geocode', authMiddleware, async (req, res, next) => {
   try {
     const { address } = req.body;

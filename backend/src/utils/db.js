@@ -77,6 +77,8 @@ export async function initDB() {
   await addColumnIfMissing('solicitudes', 'pickup_lat',  'DOUBLE PRECISION');
   await addColumnIfMissing('solicitudes', 'pickup_lon',  'DOUBLE PRECISION');
   await addColumnIfMissing('solicitudes', 'pickup_name', 'TEXT');
+  await addColumnIfMissing('solicitudes', 'pickup_direccion', 'TEXT');
+  await addColumnIfMissing('solicitudes', 'pickup_universidad', 'TEXT');
 
   // --- Tabla horarios ---
   await pool.query(`

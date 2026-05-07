@@ -39,12 +39,37 @@ app.get('/health', async (_req, res) => {
   }
 });
 
+app.get('/api/geocode', async (req, res, next) => {
+  try {
+    const q = req.query.q;
+
+    if (!q) {
+      return res.status(400).json({
+        message: 'q requerido'
+      });
+    }
+
+    const result = await import('./services/maps.service.js');
+
+    const data = await result.getCoordinates(q);
+
+    res.json({
+      lat: data.lat,
+      lon: data.lon,
+      displayName: data.displayName || q
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.use('/api/auth',        authRouter);
 app.use('/api/users',       usersRouter);
 app.use('/api/solicitudes', solicitudesRouter);
 app.use('/api/viajes',      viajesRouter);
 app.use('/api/horarios',    horariosRouter);
 app.use('/api/map',  mapRouter);
+app.use('/api/maps', mapRouter);
 // ===============================
 //  MANEJADOR DE ERRORES GLOBAL
 // ===============================
