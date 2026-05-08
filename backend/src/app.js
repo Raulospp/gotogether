@@ -1,22 +1,23 @@
 import 'dotenv/config';
-import express       from 'express';
-import cors          from 'cors';
-
-import { pool }      from './config/db.js';
-import { waitForDB, initDB } from './utils/db.js';
-
+import express       from "express";
+import cors          from "cors";
+ 
+import { pool }      from "./config/db.js";
+import { waitForDB, initDB } from "./utils/db.js";
+ 
 import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
 import solicitudesRouter from './routes/solicitudes.js';
 import viajesRouter from './routes/viajes.js';
 import horariosRouter  from './routes/horarios.js';
 import mapRouter  from './routes/maps.js';
+import { getCoordinates } from './services/maps.service.js';
 // ===============================
 //  CONFIGURACIÓN
 // ===============================
 const app  = express();
 const PORT = process.env.PORT || 3000;
-
+ 
 // ===============================
 //  MIDDLEWARES GLOBALES
 // ===============================
@@ -26,7 +27,7 @@ app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
-
+ 
 // ===============================
 //  RUTAS
 // ===============================
@@ -38,47 +39,32 @@ app.get('/health', async (_req, res) => {
     res.status(503).json({ status: 'error', db: 'unreachable' });
   }
 });
-
-app.get('/api/geocode', async (req, res, next) => {
-  try {
-    const q = req.query.q;
-
-    if (!q) {
-      return res.status(400).json({
-        message: 'q requerido'
-      });
-    }
-
-    const result = await import('./services/maps.service.js');
-
-    const data = await result.getCoordinates(q);
-
-    res.json({
-      lat: data.lat,
-      lon: data.lon,
-      displayName: data.displayName || q
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
+ 
 app.use('/api/auth',        authRouter);
 app.use('/api/users',       usersRouter);
 app.use('/api/solicitudes', solicitudesRouter);
 app.use('/api/viajes',      viajesRouter);
 app.use('/api/horarios',    horariosRouter);
-app.use('/api/map',  mapRouter);
-app.use('/api/maps', mapRouter);
+app.use('/api/maps',       mapRouter);
+ 
+app.get('/api/geocode', async (req, res, next) => {
+  try {
+    const q = req.query.q;
+    if (!q) return res.status(400).json({ message: 'Parámetro q requerido' });
+    const result = await getCoordinates(String(q));
+    res.json(result);
+  } catch (err) { next(err); }
+});
+ 
 // ===============================
 //  MANEJADOR DE ERRORES GLOBAL
 // ===============================
-// eslint-disable-next-line no-unused-vars
+
 app.use((err, _req, res, _next) => {
   console.error('Error:', err);
   res.status(500).json({ message: 'Error interno del servidor' });
 });
-
+ 
 // ===============================
 //  ARRANQUE
 // ===============================
@@ -94,5 +80,5 @@ async function start() {
     process.exit(1);
   }
 }
-
+ 
 start();

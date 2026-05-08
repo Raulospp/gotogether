@@ -74,13 +74,7 @@ router.get('/mis-solicitudes', authMiddleware, async (req, res, next) => {
     const result = await pool.query(`
       SELECT
         s.id, s.estado, s.created_at, s.iniciado_por,
-        s.pasajero_id,
-        s.conductor_id,
-        s.pickup_lat,
-        s.pickup_lon,
-        s.pickup_name,
-        s.pickup_direccion,
-        s.pickup_universidad,
+        s.pasajero_id, s.conductor_id,
         p.name  AS pasajero_name,
         p.city  AS pasajero_city,
         p.university AS pasajero_university,
@@ -145,70 +139,66 @@ router.delete('/:id', authMiddleware, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+// ── Guardar punto de recogida del pasajero ───────────────────────────────────
+// PATCH /api/solicitudes/:id/pickup
+// Body: { pickup_lat, pickup_lon, pickup_direccion, pickup_universidad, destino_lat, destino_lon }
+// El frontend llama este endpoint desde FeedView, ViajeView y PerfilView.
 router.patch('/:id/pickup', authMiddleware, async (req, res, next) => {
   try {
     const {
-      pickup_lat,
-      pickup_lon,
-      pickup_direccion,
-      pickup_universidad
+      pickup_lat, pickup_lon,
+      pickup_direccion, pickup_universidad,
+      destino_lat, destino_lon,
     } = req.body;
 
-    if (!pickup_lat || !pickup_lon) {
-      return res.status(400).json({
-        message: 'pickup_lat y pickup_lon son requeridos'
-      });
+    if (pickup_lat == null || pickup_lon == null) {
+      return res.status(400).json({ message: 'pickup_lat y pickup_lon son requeridos' });
     }
 
-    const solicitud = await pool.query(
-      'SELECT * FROM solicitudes WHERE id = $1',
-      [req.params.id]
-    );
-
-    if (!solicitud.rows.length) {
-      return res.status(404).json({
-        message: 'Solicitud no encontrada'
-      });
+    // Reverse geocoding para nombre legible (best-effort)
+    let pickup_name = pickup_direccion || '';
+    if (!pickup_name) {
+      try {
+        const params = new URLSearchParams({ lat: pickup_lat, lon: pickup_lon, format: 'json' });
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`, {
+          headers: { 'User-Agent': 'goTogether/1.0' },
+        });
+        if (geoRes.ok) {
+          const geoData = await geoRes.json();
+          pickup_name = geoData.display_name ?? '';
+        }
+      } catch { /* no crítico */ }
     }
 
-    const sol = solicitud.rows[0];
+    const updated = await pool.query(`
+      UPDATE solicitudes
+      SET pickup_lat          = $1,
+          pickup_lon          = $2,
+          pickup_name         = $3,
+          pickup_direccion    = $4,
+          pickup_universidad  = $5,
+          destino_lat         = $6,
+          destino_lon         = $7
+      WHERE id = $8
+        AND (pasajero_id = $9 OR conductor_id = $9)
+      RETURNING id
+    `, [
+      pickup_lat, pickup_lon, pickup_name,
+      pickup_direccion   || '',
+      pickup_universidad || '',
+      destino_lat        || null,
+      destino_lon        || null,
+      req.params.id,
+      req.user.id,
+    ]);
 
-    const permitido =
-      sol.pasajero_id == req.user.id ||
-      sol.conductor_id == req.user.id;
-
-    if (!permitido) {
-      return res.status(403).json({
-        message: 'No autorizado'
-      });
+    if (!updated.rows.length) {
+      return res.status(404).json({ message: 'Solicitud no encontrada o sin permiso' });
     }
 
-    const result = await pool.query(
-      `UPDATE solicitudes
-       SET
-         pickup_lat = $1,
-         pickup_lon = $2,
-         pickup_direccion = $3,
-         pickup_universidad = $4,
-         pickup_name = $3
-       WHERE id = $5
-       RETURNING *`,
-      [
-        pickup_lat,
-        pickup_lon,
-        pickup_direccion,
-        pickup_universidad,
-        req.params.id
-      ]
-    );
-
-    res.json({
-      message: 'Pickup actualizado',
-      solicitud: result.rows[0]
-    });
-  } catch (err) {
-    next(err);
-  }
+    res.json({ message: 'Punto de recogida guardado', pickup_name });
+  } catch (err) { next(err); }
 });
 
 export default router;

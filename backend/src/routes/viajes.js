@@ -58,6 +58,9 @@ router.get('/mis-viajes', authMiddleware, async (req, res, next) => {
           p.id AS pasajero_id, p.name AS pasajero_name,
           p.city AS pasajero_city, p.university AS pasajero_university,
           p.phone AS pasajero_phone,
+          s.pickup_lat, s.pickup_lon, s.pickup_name,
+          s.pickup_direccion, s.pickup_universidad,
+          s.destino_lat, s.destino_lon,
           COALESCE(h.schedule, '{}') AS schedule,
           COALESCE(h.routes,   '{}') AS routes,
           COALESCE(h.precio,   '{}') AS precio
@@ -106,6 +109,9 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
           p.id AS pasajero_id, p.name AS pasajero_name,
           p.city AS pasajero_city, p.university AS pasajero_university,
           p.phone AS pasajero_phone,
+          s.pickup_lat, s.pickup_lon, s.pickup_name,
+          s.pickup_direccion, s.pickup_universidad,
+          s.destino_lat, s.destino_lon,
           COALESCE(h.schedule, '{}') AS schedule,
           COALESCE(h.routes,   '{}') AS routes,
           COALESCE(h.precio,   '{}') AS precio

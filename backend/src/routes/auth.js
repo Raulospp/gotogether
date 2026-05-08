@@ -130,6 +130,7 @@ router.post('/login', async (req, res, next) => {
 
     res.json({
       message:       'Login exitoso',
+      token:         accessToken,   // alias legacy para compatibilidad con el frontend existente
       access_token:  accessToken,
       refresh_token: refreshToken,
       expires_in:    ACCESS_TOKEN_TTL,
