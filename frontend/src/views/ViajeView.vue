@@ -141,7 +141,7 @@ const route = useRoute();
 const authStore = useAuthStore();
 const isConductor = computed(() => authStore.user?.role === 'conductor');
 const solicitudId = Number(route.params.id);
-const API = 'http://localhost:3000';
+const API = 'https://gotogether-api.onrender.com';
 const loading = ref(true);
 const viaje = ref<any>(null);
 

@@ -1,3 +1,4 @@
+
 import { Router }        from 'express';
 import { pool }           from '../config/db.js';
 import { authMiddleware } from '../middlewares/auth.js';
@@ -57,3 +58,4 @@ router.get('/pasajeros', authMiddleware, async (req, res, next) => {
 });
 
 export default router;
+
