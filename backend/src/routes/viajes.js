@@ -1,6 +1,7 @@
 import { Router }        from 'express';
 import { pool }           from '../config/db.js';
 import { authMiddleware } from '../middlewares/auth.js';
+import { calcularResumenConductor } from '../services/pricing.service.js';
 
 const router = Router();
 
@@ -90,6 +91,28 @@ router.get('/mis-viajes', authMiddleware, async (req, res, next) => {
           AND s.fecha_viaje = CURRENT_DATE
         ORDER BY s.created_at DESC
       `, [userId]);
+    }
+
+    // Para el conductor: enriquecer con precios calculados
+    if (userRole === 'conductor' && result.rows.length > 0) {
+      try {
+        const resumen = await calcularResumenConductor(userId, pool);
+        // Mapear precio a cada fila por solicitud_id
+        const precioMap = Object.fromEntries(
+          resumen.pasajeros.map(p => [p.solicitud_id, p])
+        );
+        const rows = result.rows.map(row => ({
+          ...row,
+          precio_pasajero:  precioMap[row.solicitud_id]?.precio      ?? null,
+          distancia_km:     precioMap[row.solicitud_id]?.distanciaKm ?? null,
+          tarifa_cop_km:    resumen.tarifaCopKm,
+          total_conductor:  resumen.totalConductor,
+          resumen_precio:   resumen.resumen,
+        }));
+        return res.json(rows);
+      } catch {
+        // Si el cálculo falla, devolver sin precios
+      }
     }
 
     res.json(result.rows);

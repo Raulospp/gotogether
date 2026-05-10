@@ -4,10 +4,11 @@ import { authMiddleware } from '../middlewares/auth.js';
 
 const router = Router();
 
-// ── Guardar / actualizar horario ────────────────────────────────────────────
+// ─── POST / — guardar o actualizar horario ────────────────────────────────────
+
 router.post('/', authMiddleware, async (req, res, next) => {
   try {
-    const { schedule, routes, precio } = req.body;
+    const { schedule = {}, routes = {}, precio = {} } = req.body;
 
     await pool.query(`
       INSERT INTO horarios (user_id, schedule, routes, precio, updated_at)
@@ -19,24 +20,25 @@ router.post('/', authMiddleware, async (req, res, next) => {
             updated_at = NOW()
     `, [
       req.user.id,
-      JSON.stringify(schedule || {}),
-      JSON.stringify(routes   || {}),
-      JSON.stringify(precio   || {}),
+      JSON.stringify(schedule),
+      JSON.stringify(routes),
+      JSON.stringify(precio),
     ]);
 
     res.json({ message: 'Horario guardado' });
   } catch (err) { next(err); }
 });
 
-// ── Obtener horario propio ──────────────────────────────────────────────────
+// ─── GET /me — obtener horario propio ─────────────────────────────────────────
+
 router.get('/me', authMiddleware, async (req, res, next) => {
   try {
-    const result = await pool.query(
-      'SELECT schedule, routes, precio FROM horarios WHERE user_id = $1',
+    const { rows } = await pool.query(
+      'SELECT schedule, routes, precio FROM horarios WHERE user_id=$1',
       [req.user.id],
     );
-    if (result.rows.length === 0) return res.json({ schedule: {}, routes: {}, precio: {} });
-    res.json(result.rows[0]);
+
+    res.json(rows[0] ?? { schedule: {}, routes: {}, precio: {} });
   } catch (err) { next(err); }
 });
 

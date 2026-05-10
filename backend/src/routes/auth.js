@@ -106,9 +106,76 @@ router.get('/verify', async (req, res) => {
       [decoded.email],
     );
     if (result.rows.length === 0) return res.status(404).send('Usuario no encontrado');
-    res.send(`<html><body style="font-family:sans-serif;background:#070707;color:#ede9e6;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-      <div style="text-align:center;"><h1 style="color:#a32020">✓ Cuenta verificada</h1><p>Ya puedes iniciar sesión en <strong>goTogether</strong></p></div>
-    </body></html>`);
+    // Redirigir a la app con parámetro de éxito
+    const appUrl = process.env.BASE_URL || process.env.APP_URL || 'https://gotogether-nhuj.onrender.com';
+    res.send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuenta verificada · goTogether</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #070707;
+      color: #ede9e6;
+      font-family: 'DM Sans', -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .card {
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      background: #111;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 24px;
+      padding: 48px 32px;
+      animation: up 0.5s ease both;
+    }
+    @keyframes up { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+    .icon { font-size: 56px; margin-bottom: 20px; }
+    h1 { font-family: 'Outfit', sans-serif; font-size: 26px; font-weight: 800; color: #ede9e6; margin-bottom: 10px; letter-spacing: -0.5px; }
+    p { color: rgba(237,233,230,0.45); font-size: 14px; line-height: 1.6; margin-bottom: 28px; }
+    .btn {
+      display: inline-block;
+      background: #8B1A1A;
+      color: #ede9e6;
+      text-decoration: none;
+      padding: 16px 32px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      box-shadow: 0 8px 28px rgba(139,26,26,0.4);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(37,211,102,0.1);
+      border: 1px solid rgba(37,211,102,0.25);
+      color: #25d366;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✅</div>
+    <div class="badge">✓ Email confirmado</div>
+    <h1>¡Cuenta activada!</h1>
+    <p>Tu cuenta en <strong style="color:#a32020">goTogether</strong> ha sido verificada exitosamente.<br>Ya puedes iniciar sesión.</p>
+    <a href="${appUrl}" class="btn">Abrir goTogether</a>
+  </div>
+</body>
+</html>`);
   } catch { res.status(400).send('Token inválido o expirado'); }
 });
 
@@ -124,6 +191,15 @@ router.post('/login', async (req, res, next) => {
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ message: 'Credenciales inválidas' });
+
+    // Bloquear login si la cuenta no ha sido verificada por correo
+    if (!user.verified) {
+      return res.status(403).json({
+        message: 'Cuenta no verificada',
+        code:    'EMAIL_NOT_VERIFIED',
+        email:   user.email,
+      });
+    }
 
     const accessToken  = makeAccessToken(user);
     const refreshToken = await makeRefreshToken(user.id, device ?? null);
@@ -192,6 +268,40 @@ router.delete('/logout-all', authMiddleware, async (req, res, next) => {
   try {
     await pool.query('DELETE FROM refresh_tokens WHERE user_id=$1', [req.user.id]);
     res.json({ message: 'Todas las sesiones cerradas' });
+  } catch (err) { next(err); }
+});
+
+
+// ── Reenviar correo de verificación ──────────────────────────────────────────
+// POST /api/auth/resend-verification
+// Body: { email }
+// Úsalo cuando el usuario dice que no le llegó el correo.
+router.post('/resend-verification', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'email requerido' });
+
+    const result = await pool.query(
+      'SELECT id, name, verified FROM users WHERE email = $1',
+      [email],
+    );
+
+    // Responder igual aunque no exista (evita enumeración de correos)
+    if (!result.rows.length || result.rows[0].verified) {
+      return res.json({ message: 'Si el correo existe y no está verificado, recibirás un nuevo enlace.' });
+    }
+
+    const user        = result.rows[0];
+    const verifyToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
+
+    await pool.query(
+      'UPDATE users SET verify_token = $1 WHERE id = $2',
+      [verifyToken, user.id],
+    );
+
+    await sendVerificationEmail(email, user.name, verifyToken);
+
+    res.json({ message: 'Correo de verificación reenviado. Revisa tu bandeja.' });
   } catch (err) { next(err); }
 });
 
