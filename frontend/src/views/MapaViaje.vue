@@ -154,14 +154,23 @@ function cargarGM(): Promise<void> {
 }
 
 const estiloOscuro = [
-  { elementType: 'geometry', stylers: [{ color: '#0f0f0f' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#888' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0f0f0f' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#2a2a2a' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a0a0a' }] },
+  { elementType: 'geometry', stylers: [{ color: '#1e2535' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8fa3c0' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1e2535' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d3a52' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1e2535' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3d5278' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#243453' }] },
+  { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#6b85a8' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f1924' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3d6a8a' }] },
+  { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#1a2740' }] },
+  { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#1e2a3d' }] },
   { featureType: 'poi', stylers: [{ visibility: 'off' }] },
   { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#2d3a52' }] },
+  { featureType: 'administrative.country', elementType: 'labels.text.fill', stylers: [{ color: '#9aa3b2' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#c4c9d4' }] },
 ];
 
 function mkIcon(G: any, color: string, size: number, border: string) {
