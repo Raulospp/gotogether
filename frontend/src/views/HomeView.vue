@@ -295,7 +295,11 @@ async function syncHorarioDB() {
     const token = localStorage.getItem('token');
     if (!token) { console.warn('syncHorarioDB: no token'); return; }
     console.log('Sincronizando horario...', schedule.value);
+<<<<<<< HEAD
+    const res = await fetch('http://localhost:3000/api/horarios', {
+=======
     const res = await fetch('https://gotogether-api.onrender.com/api/horarios', {
+>>>>>>> origin/main
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ schedule: schedule.value, routes: routes.value, precio: precio.value }),
@@ -310,7 +314,11 @@ async function loadHorarioDB() {
   try {
     const token = localStorage.getItem('token');
     if (!token) return;
+<<<<<<< HEAD
+    const res = await fetch('http://localhost:3000/api/horarios/me', {
+=======
     const res = await fetch('https://gotogether-api.onrender.com/api/horarios/me', {
+>>>>>>> origin/main
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) return;
