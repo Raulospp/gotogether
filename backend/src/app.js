@@ -13,6 +13,7 @@ import solicitudesRouter from './routes/solicitudes.js';
 import viajesRouter      from './routes/viajes.js';
 import horariosRouter    from './routes/horarios.js';
 import mapsRouter        from './routes/maps.js';
+import pricingRouter     from './routes/price.js';
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ app.use('/api/solicitudes', solicitudesRouter);
 app.use('/api/viajes',      viajesRouter);
 app.use('/api/horarios',    horariosRouter);
 app.use('/api/maps',        mapsRouter);
+app.use('/api/pricing',     pricingRouter);
 
 // ─── Error handler global ─────────────────────────────────────────────────────
 

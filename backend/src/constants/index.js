@@ -14,10 +14,9 @@ export const ESTADOS = Object.freeze({
 
 // ─── Configuración de tokens ──────────────────────────────────────────────────
 export const TOKEN = Object.freeze({
-  ACCESS_TTL:        '15m',
-  REFRESH_DAYS:      30,
-  VERIFY_EMAIL_TTL:  '24h',
-  REFRESH_BYTES:     64,
+  ACCESS_TTL:    '15m',
+  REFRESH_DAYS:  30,
+  REFRESH_BYTES: 64,
 });
 
 // ─── Límites del dominio ──────────────────────────────────────────────────────

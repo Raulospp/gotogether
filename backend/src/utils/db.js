@@ -23,20 +23,6 @@ export async function waitForDB(
   }
 }
 
-// ─── Migraciones ──────────────────────────────────────────────────────────────
-
-export async function addColumnIfMissing(table, column, type) {
-  try {
-    await pool.query(
-      `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${column} ${type}`,
-    );
-  } catch (err) {
-    if (!err.message.includes('already exists')) {
-      console.warn(`⚠️  No se pudo agregar ${table}.${column}: ${err.message}`);
-    }
-  }
-}
-
 async function createTableUsers() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -53,18 +39,10 @@ async function createTableUsers() {
       vehicle_type  VARCHAR(20)  DEFAULT 'carro',
       capacity      INTEGER      DEFAULT 4,
       phone         VARCHAR(20),
-      verified      BOOLEAN      DEFAULT FALSE,
-      verify_token  TEXT,
+      verified      BOOLEAN      DEFAULT TRUE,
       created_at    TIMESTAMPTZ  DEFAULT NOW()
     );
   `);
-
-  // Columnas agregadas en versiones posteriores
-  await addColumnIfMissing('users', 'vehicle_type', "VARCHAR(20) DEFAULT 'carro'");
-  await addColumnIfMissing('users', 'capacity',     'INTEGER DEFAULT 4');
-  await addColumnIfMissing('users', 'phone',        'VARCHAR(20)');
-  await addColumnIfMissing('users', 'verified',     'BOOLEAN DEFAULT FALSE');
-  await addColumnIfMissing('users', 'verify_token', 'TEXT');
 }
 
 async function createTableSolicitudes() {
@@ -76,19 +54,16 @@ async function createTableSolicitudes() {
       iniciado_por  INTEGER REFERENCES users(id) ON DELETE CASCADE,
       estado        VARCHAR(20)      DEFAULT 'pendiente',
       fecha_viaje   DATE             DEFAULT CURRENT_DATE,
+      pickup_lat         DOUBLE PRECISION,
+      pickup_lon         DOUBLE PRECISION,
+      pickup_name        TEXT,
+      pickup_direccion   TEXT,
+      pickup_universidad TEXT,
+      destino_lat        DOUBLE PRECISION,
+      destino_lon        DOUBLE PRECISION,
       created_at    TIMESTAMPTZ      DEFAULT NOW()
     );
   `);
-
-  await addColumnIfMissing('solicitudes', 'iniciado_por',       'INTEGER REFERENCES users(id) ON DELETE CASCADE');
-  await addColumnIfMissing('solicitudes', 'fecha_viaje',        'DATE DEFAULT CURRENT_DATE');
-  await addColumnIfMissing('solicitudes', 'pickup_lat',         'DOUBLE PRECISION');
-  await addColumnIfMissing('solicitudes', 'pickup_lon',         'DOUBLE PRECISION');
-  await addColumnIfMissing('solicitudes', 'pickup_name',        'TEXT');
-  await addColumnIfMissing('solicitudes', 'pickup_direccion',   'TEXT');
-  await addColumnIfMissing('solicitudes', 'pickup_universidad', 'TEXT');
-  await addColumnIfMissing('solicitudes', 'destino_lat',        'DOUBLE PRECISION');
-  await addColumnIfMissing('solicitudes', 'destino_lon',        'DOUBLE PRECISION');
 }
 
 async function createTableHorarios() {
@@ -102,8 +77,6 @@ async function createTableHorarios() {
       updated_at TIMESTAMPTZ  DEFAULT NOW()
     );
   `);
-
-  await addColumnIfMissing('horarios', 'precio', "JSONB DEFAULT '{}'");
 }
 
 async function createTableRefreshTokens() {

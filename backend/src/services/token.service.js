@@ -15,10 +15,6 @@ export function signAccessToken(user) {
   );
 }
 
-export function signVerifyToken(email) {
-  return jwt.sign({ email }, SECRET, { expiresIn: TOKEN.VERIFY_EMAIL_TTL });
-}
-
 export function verifyJwt(token) {
   return jwt.verify(token, SECRET); // lanza si es inválido o expirado
 }

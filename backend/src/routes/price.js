@@ -1,16 +1,17 @@
-
-import { Router } from 'express';
-import { pool } from '../config/db.js';
+import { Router }        from 'express';
+import { pool }           from '../config/db.js';
 import { authMiddleware } from '../middlewares/auth.js';
+import { ROLES }          from '../constants/index.js';
 import {
   calcularPrecioPasajero,
-  calcularResumenConductor } from "../services/price.service.js";
+  calcularResumenConductor,
+} from '../services/price.service.js';
 
 const router = Router();
 
 router.patch('/tarifa', authMiddleware, async (req, res, next) => {
   try {
-    if (req.user.role !== 'conductor') {
+    if (req.user.role !== ROLES.CONDUCTOR) {
       return res.status(403).json({ message: 'Solo conductores pueden configurar tarifas' });
     }
 
@@ -48,7 +49,7 @@ router.patch('/tarifa', authMiddleware, async (req, res, next) => {
 
 router.get('/tarifa', authMiddleware, async (req, res, next) => {
   try {
-    if (req.user.role !== 'conductor') {
+    if (req.user.role !== ROLES.CONDUCTOR) {
       return res.status(403).json({ message: 'Solo conductores' });
     }
 
@@ -70,7 +71,7 @@ router.get('/tarifa', authMiddleware, async (req, res, next) => {
 
 router.get('/resumen', authMiddleware, async (req, res, next) => {
   try {
-    if (req.user.role !== 'conductor') {
+    if (req.user.role !== ROLES.CONDUCTOR) {
       return res.status(403).json({ message: 'Solo conductores pueden ver el resumen' });
     }
 
@@ -180,8 +181,8 @@ router.get('/conductor/:conductorId/tarifa', authMiddleware, async (req, res, ne
     // Si el pasajero pasó sus coordenadas, calcular estimación
     if (pickup_lat && pickup_lon && destino_lat && destino_lon) {
       const { distanciaKm, precioPasajero } = await calcularPrecioPasajero(
-        { lat: parseFloat(pickup_lat as String),  lon: parseFloat(pickup_lon as string)  },
-        { lat: parseFloat(destino_lat as String), lon: parseFloat(destino_lon as string) },
+        { lat: parseFloat(pickup_lat),  lon: parseFloat(pickup_lon)  },
+        { lat: parseFloat(destino_lat), lon: parseFloat(destino_lon) },
         tarifaCopKm,
       );
 

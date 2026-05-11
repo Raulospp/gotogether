@@ -1,7 +1,7 @@
 import { Router }        from 'express';
 import { pool }           from '../config/db.js';
 import { authMiddleware } from '../middlewares/auth.js';
-import { calcularResumenConductor } from '../services/pricing.service.js';
+import { calcularResumenConductor } from '../services/price.service.js';
 
 const router = Router();
 
