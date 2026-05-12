@@ -1,169 +1,20 @@
-import { Router }        from 'express';
-import { pool }           from '../config/db.js';
+import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.js';
-import { calcularResumenConductor } from '../services/price.service.js';
+import {
+  iniciarViaje,
+  finalizarViaje,
+  limpiarPasados,
+  getMisViajes,
+  getViajeById,
+} from '../controllers/viajes.controller.js';
 
 const router = Router();
 
-// ── Iniciar viaje ───────────────────────────────────────────────────────────
-router.patch('/:id/iniciar', authMiddleware, async (req, res, next) => {
-  try {
-    const check = await pool.query(
-      `SELECT id FROM solicitudes
-       WHERE id = $1 AND conductor_id = $2 AND estado = 'aceptada'`,
-      [req.params.id, req.user.id],
-    );
-    if (check.rows.length === 0) return res.status(403).json({ message: 'No puedes iniciar este viaje' });
-
-    await pool.query(`UPDATE solicitudes SET estado = 'en_curso' WHERE id = $1`, [req.params.id]);
-    res.json({ message: 'Viaje iniciado' });
-  } catch (err) { next(err); }
-});
-
-// ── Finalizar viaje ─────────────────────────────────────────────────────────
-router.patch('/:id/finalizar', authMiddleware, async (req, res, next) => {
-  try {
-    const check = await pool.query(
-      `SELECT id FROM solicitudes
-       WHERE id = $1 AND conductor_id = $2 AND estado = 'en_curso'`,
-      [req.params.id, req.user.id],
-    );
-    if (check.rows.length === 0) return res.status(403).json({ message: 'No puedes finalizar este viaje' });
-
-    await pool.query('DELETE FROM solicitudes WHERE id = $1', [req.params.id]);
-    res.json({ message: 'Viaje finalizado' });
-  } catch (err) { next(err); }
-});
-
-// ── Limpiar viajes pasados ──────────────────────────────────────────────────
-// ⚠️  Debe estar ANTES de /:id para que Express no lo trate como un param
-router.delete('/limpiar-pasados', authMiddleware, async (req, res, next) => {
-  try {
-    const result = await pool.query(
-      `DELETE FROM solicitudes WHERE estado = 'aceptada' AND fecha_viaje < CURRENT_DATE RETURNING id`,
-    );
-    res.json({ message: `${result.rowCount} viajes pasados eliminados` });
-  } catch (err) { next(err); }
-});
-
-// ── Mis viajes activos ──────────────────────────────────────────────────────
-router.get('/mis-viajes', authMiddleware, async (req, res, next) => {
-  try {
-    const { id: userId, role: userRole } = req.user;
-    let result;
-
-    if (userRole === 'conductor') {
-      result = await pool.query(`
-        SELECT
-          s.id AS solicitud_id, s.estado, s.fecha_viaje, s.created_at,
-          p.id AS pasajero_id, p.name AS pasajero_name,
-          p.city AS pasajero_city, p.university AS pasajero_university,
-          p.phone AS pasajero_phone,
-          s.pickup_lat, s.pickup_lon, s.pickup_name,
-          s.pickup_direccion, s.pickup_universidad,
-          s.destino_lat, s.destino_lon,
-          COALESCE(h.schedule, '{}') AS schedule,
-          COALESCE(h.routes,   '{}') AS routes,
-          COALESCE(h.precio,   '{}') AS precio
-        FROM solicitudes s
-        JOIN users p ON p.id = s.pasajero_id
-        LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.conductor_id = $1
-          AND s.estado IN ('aceptada','en_curso')
-          AND s.fecha_viaje = CURRENT_DATE
-        ORDER BY s.created_at DESC
-      `, [userId]);
-    } else {
-      result = await pool.query(`
-        SELECT
-          s.id AS solicitud_id, s.estado, s.fecha_viaje, s.created_at,
-          c.id AS conductor_id, c.name AS conductor_name,
-          c.city AS conductor_city, c.car_model, c.plate,
-          c.vehicle_type, c.phone AS conductor_phone,
-          COALESCE(h.schedule, '{}') AS schedule,
-          COALESCE(h.routes,   '{}') AS routes,
-          COALESCE(h.precio,   '{}') AS precio
-        FROM solicitudes s
-        JOIN users c ON c.id = s.conductor_id
-        LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.pasajero_id = $1
-          AND s.estado IN ('aceptada','en_curso')
-          AND s.fecha_viaje = CURRENT_DATE
-        ORDER BY s.created_at DESC
-      `, [userId]);
-    }
-
-    // Para el conductor: enriquecer con precios calculados
-    if (userRole === 'conductor' && result.rows.length > 0) {
-      try {
-        const resumen = await calcularResumenConductor(userId, pool);
-        // Mapear precio a cada fila por solicitud_id
-        const precioMap = Object.fromEntries(
-          resumen.pasajeros.map(p => [p.solicitud_id, p])
-        );
-        const rows = result.rows.map(row => ({
-          ...row,
-          precio_pasajero:  precioMap[row.solicitud_id]?.precio      ?? null,
-          distancia_km:     precioMap[row.solicitud_id]?.distanciaKm ?? null,
-          tarifa_cop_km:    resumen.tarifaCopKm,
-          total_conductor:  resumen.totalConductor,
-          resumen_precio:   resumen.resumen,
-        }));
-        return res.json(rows);
-      } catch {
-        // Si el cálculo falla, devolver sin precios
-      }
-    }
-
-    res.json(result.rows);
-  } catch (err) { next(err); }
-});
-
-// ── Detalle de un viaje ─────────────────────────────────────────────────────
-router.get('/:id', authMiddleware, async (req, res, next) => {
-  try {
-    const { id: userId, role: userRole } = req.user;
-    let result;
-
-    if (userRole === 'conductor') {
-      result = await pool.query(`
-        SELECT
-          s.id AS solicitud_id, s.estado, s.fecha_viaje, s.created_at,
-          p.id AS pasajero_id, p.name AS pasajero_name,
-          p.city AS pasajero_city, p.university AS pasajero_university,
-          p.phone AS pasajero_phone,
-          s.pickup_lat, s.pickup_lon, s.pickup_name,
-          s.pickup_direccion, s.pickup_universidad,
-          s.destino_lat, s.destino_lon,
-          COALESCE(h.schedule, '{}') AS schedule,
-          COALESCE(h.routes,   '{}') AS routes,
-          COALESCE(h.precio,   '{}') AS precio
-        FROM solicitudes s
-        JOIN users p ON p.id = s.pasajero_id
-        LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.id = $1 AND s.conductor_id = $2
-      `, [req.params.id, userId]);
-    } else {
-      result = await pool.query(`
-        SELECT
-          s.id AS solicitud_id, s.estado, s.fecha_viaje, s.created_at,
-          c.id AS conductor_id, c.name AS conductor_name,
-          c.city AS conductor_city, c.car_model, c.plate,
-          c.vehicle_type, c.phone AS conductor_phone,
-          COALESCE(h.schedule, '{}') AS schedule,
-          COALESCE(h.routes,   '{}') AS routes,
-          COALESCE(h.precio,   '{}') AS precio
-        FROM solicitudes s
-        JOIN users c ON c.id = s.conductor_id
-        LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.id = $1 AND s.pasajero_id = $2
-      `, [req.params.id, userId]);
-    }
-
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Viaje no encontrado' });
-    res.json(result.rows[0]);
-  } catch (err) { next(err); }
-});
-
+// ⚠️ Rutas estáticas ANTES de /:id para que Express no las interprete como parámetro
+router.delete('/limpiar-pasados', authMiddleware, limpiarPasados);
+router.get('/mis-viajes',         authMiddleware, getMisViajes);
+router.get('/:id',                authMiddleware, getViajeById);
+router.patch('/:id/iniciar',      authMiddleware, iniciarViaje);
+router.patch('/:id/finalizar',    authMiddleware, finalizarViaje);
 
 export default router;
