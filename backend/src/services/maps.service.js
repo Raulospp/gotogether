@@ -1,3 +1,4 @@
+import { logger } from '../config/logger.js';
 import { haversine }              from '../utils/geo.js';
 import { normalizeText, metersToKm, secondsToMin } from '../utils/format.js';
 import { EXTERNAL, LIMITS }      from '../constants/index.js';
@@ -123,7 +124,7 @@ export async function getSuggestedDrivers(destinationQuery, pool, radiusKm = LIM
   try {
     destCoords = await getCoordinates(destinationQuery);
   } catch {
-    console.warn(`⚠️  No se pudo geocodificar "${destinationQuery}"`);
+    logger.warn('No se pudo geocodificar destino', { query: destinationQuery });
   }
 
   const { rows: drivers } = await pool.query(`

@@ -1,4 +1,5 @@
 import { EXTERNAL, LIMITS } from '../constants/index.js';
+import { logger }           from '../config/logger.js';
 
 
 export async function snapToRoad(point) {
@@ -27,7 +28,7 @@ export async function snapToRoad(point) {
       name: data.display_name ?? '',
     };
   } catch (err) {
-    console.warn('⚠️  snapToRoad falló (no crítico):', err.message);
+    logger.warn('snapToRoad falló', { message: err.message });
     return { lat: point.lat, lon: point.lon, name: '' };
   }
 }

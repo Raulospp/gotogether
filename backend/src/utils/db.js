@@ -1,4 +1,5 @@
 import { pool }   from '../config/db.js';
+import { logger } from '../config/logger.js';
 import { LIMITS } from '../constants/index.js';
 
 // ─── Conexión ─────────────────────────────────────────────────────────────────
@@ -11,10 +12,10 @@ export async function waitForDB(
     try {
       const client = await pool.connect();
       client.release();
-      console.log(`✅ DB lista (intento ${attempt})`);
+      logger.info(`DB lista (intento ${attempt})`);
       return;
     } catch (err) {
-      console.warn(`⏳ DB no disponible (${attempt}/${maxRetries}): ${err.message}`);
+      logger.warn(`DB no disponible (${attempt}/${maxRetries}): ${err.message}`);
       if (attempt === maxRetries) {
         throw new Error('No se pudo conectar a la base de datos');
       }
@@ -110,5 +111,5 @@ export async function initDB() {
   await createTableHorarios();
   await createTableRefreshTokens();
   await createIndexes();
-  console.log('✅ Base de datos lista');
+  logger.info('Base de datos inicializada');
 }

@@ -1,158 +1,108 @@
-import { pool }                      from '../config/db.js';
-import { calcularResumenConductor }  from '../services/price.service.js';
-import { ROLES }                     from '../constants/index.js';
+import { pool }                     from '../config/db.js';
+import { calcularResumenConductor } from '../services/price.service.js';
+import { asyncHandler }             from '../utils/async-handler.js';
+import { ok, fail }                 from '../utils/response.js';
+import { AppError }                 from '../utils/AppError.js';
+import { ROLES, ESTADOS, HTTP }     from '../constants/index.js';
 
-// ── Iniciar viaje ─────────────────────────────────────────────────────────────
+const VIAJE_FIELDS_CONDUCTOR = `
+  s.id AS solicitud_id, s.estado, s.fecha_viaje, s.created_at,
+  p.id AS pasajero_id, p.name AS pasajero_name,
+  p.city AS pasajero_city, p.university AS pasajero_university, p.phone AS pasajero_phone,
+  s.pickup_lat, s.pickup_lon, s.pickup_name,
+  s.pickup_direccion, s.pickup_universidad, s.destino_lat, s.destino_lon,
+  COALESCE(h.schedule,'{}') AS schedule, COALESCE(h.routes,'{}') AS routes, COALESCE(h.precio,'{}') AS precio
+`;
 
-export async function iniciarViaje(req, res, next) {
-  try {
-    const { rows } = await pool.query(
-      `SELECT id FROM solicitudes WHERE id=$1 AND conductor_id=$2 AND estado='aceptada'`,
-      [req.params.id, req.user.id],
-    );
-    if (!rows.length) return res.status(403).json({ message: 'No puedes iniciar este viaje' });
+const VIAJE_FIELDS_PASAJERO = `
+  s.id AS solicitud_id, s.estado, s.fecha_viaje, s.created_at,
+  c.id AS conductor_id, c.name AS conductor_name,
+  c.city AS conductor_city, c.car_model, c.plate, c.vehicle_type, c.phone AS conductor_phone,
+  COALESCE(h.schedule,'{}') AS schedule, COALESCE(h.routes,'{}') AS routes, COALESCE(h.precio,'{}') AS precio
+`;
 
-    await pool.query(`UPDATE solicitudes SET estado='en_curso' WHERE id=$1`, [req.params.id]);
-    res.json({ message: 'Viaje iniciado' });
-  } catch (err) { next(err); }
-}
+export const iniciarViaje = asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id FROM solicitudes WHERE id=$1 AND conductor_id=$2 AND estado=$3`,
+    [req.params.id, req.user.id, ESTADOS.ACEPTADA],
+  );
+  if (!rows.length) throw AppError.forbidden('No puedes iniciar este viaje', 'VIAJE_FORBIDDEN');
 
-// ── Finalizar viaje ───────────────────────────────────────────────────────────
+  await pool.query('UPDATE solicitudes SET estado=$1 WHERE id=$2', [ESTADOS.EN_CURSO, req.params.id]);
+  ok(res, null, 'Viaje iniciado');
+});
 
-export async function finalizarViaje(req, res, next) {
-  try {
-    const { rows } = await pool.query(
-      `SELECT id FROM solicitudes WHERE id=$1 AND conductor_id=$2 AND estado='en_curso'`,
-      [req.params.id, req.user.id],
-    );
-    if (!rows.length) return res.status(403).json({ message: 'No puedes finalizar este viaje' });
+export const finalizarViaje = asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id FROM solicitudes WHERE id=$1 AND conductor_id=$2 AND estado=$3`,
+    [req.params.id, req.user.id, ESTADOS.EN_CURSO],
+  );
+  if (!rows.length) throw AppError.forbidden('No puedes finalizar este viaje', 'VIAJE_FORBIDDEN');
 
-    await pool.query('DELETE FROM solicitudes WHERE id=$1', [req.params.id]);
-    res.json({ message: 'Viaje finalizado' });
-  } catch (err) { next(err); }
-}
+  await pool.query('DELETE FROM solicitudes WHERE id=$1', [req.params.id]);
+  ok(res, null, 'Viaje finalizado');
+});
 
-// ── Limpiar viajes pasados ────────────────────────────────────────────────────
+export const limpiarPasados = asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `DELETE FROM solicitudes WHERE estado=$1 AND fecha_viaje < CURRENT_DATE RETURNING id`,
+    [ESTADOS.ACEPTADA],
+  );
+  ok(res, { eliminados: result.rowCount }, `${result.rowCount} viajes pasados eliminados`);
+});
 
-export async function limpiarPasados(req, res, next) {
-  try {
-    const result = await pool.query(
-      `DELETE FROM solicitudes WHERE estado='aceptada' AND fecha_viaje < CURRENT_DATE RETURNING id`,
-    );
-    res.json({ message: `${result.rowCount} viajes pasados eliminados` });
-  } catch (err) { next(err); }
-}
+export const getMisViajes = asyncHandler(async (req, res) => {
+  const { id: userId, role: userRole } = req.user;
+  const esConductor = userRole === ROLES.CONDUCTOR;
 
-// ── Mis viajes activos ────────────────────────────────────────────────────────
+  const queryText = esConductor
+    ? `SELECT ${VIAJE_FIELDS_CONDUCTOR} FROM solicitudes s
+       JOIN users p ON p.id = s.pasajero_id
+       LEFT JOIN horarios h ON h.user_id = s.conductor_id
+       WHERE s.conductor_id=$1 AND s.estado IN ('aceptada','en_curso') AND s.fecha_viaje = CURRENT_DATE
+       ORDER BY s.created_at DESC`
+    : `SELECT ${VIAJE_FIELDS_PASAJERO} FROM solicitudes s
+       JOIN users c ON c.id = s.conductor_id
+       LEFT JOIN horarios h ON h.user_id = s.conductor_id
+       WHERE s.pasajero_id=$1 AND s.estado IN ('aceptada','en_curso') AND s.fecha_viaje = CURRENT_DATE
+       ORDER BY s.created_at DESC`;
 
-export async function getMisViajes(req, res, next) {
-  try {
-    const { id: userId, role: userRole } = req.user;
-    let result;
+  const { rows } = await pool.query(queryText, [userId]);
 
-    if (userRole === ROLES.CONDUCTOR) {
-      result = await pool.query(`
-        SELECT
-          s.id AS solicitud_id, s.estado, s.fecha_viaje, s.created_at,
-          p.id AS pasajero_id, p.name AS pasajero_name,
-          p.city AS pasajero_city, p.university AS pasajero_university,
-          p.phone AS pasajero_phone,
-          s.pickup_lat, s.pickup_lon, s.pickup_name,
-          s.pickup_direccion, s.pickup_universidad,
-          s.destino_lat, s.destino_lon,
-          COALESCE(h.schedule, '{}') AS schedule,
-          COALESCE(h.routes,   '{}') AS routes,
-          COALESCE(h.precio,   '{}') AS precio
-        FROM solicitudes s
-        JOIN users p ON p.id = s.pasajero_id
-        LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.conductor_id=$1
-          AND s.estado IN ('aceptada','en_curso')
-          AND s.fecha_viaje = CURRENT_DATE
-        ORDER BY s.created_at DESC
-      `, [userId]);
-    } else {
-      result = await pool.query(`
-        SELECT
-          s.id AS solicitud_id, s.estado, s.fecha_viaje, s.created_at,
-          c.id AS conductor_id, c.name AS conductor_name,
-          c.city AS conductor_city, c.car_model, c.plate,
-          c.vehicle_type, c.phone AS conductor_phone,
-          COALESCE(h.schedule, '{}') AS schedule,
-          COALESCE(h.routes,   '{}') AS routes,
-          COALESCE(h.precio,   '{}') AS precio
-        FROM solicitudes s
-        JOIN users c ON c.id = s.conductor_id
-        LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.pasajero_id=$1
-          AND s.estado IN ('aceptada','en_curso')
-          AND s.fecha_viaje = CURRENT_DATE
-        ORDER BY s.created_at DESC
-      `, [userId]);
-    }
+  if (esConductor && rows.length > 0) {
+    try {
+      const resumen   = await calcularResumenConductor(userId, pool);
+      const precioMap = Object.fromEntries(resumen.pasajeros.map(p => [p.solicitud_id, p]));
+      return ok(res, rows.map(row => ({
+        ...row,
+        precio_pasajero: precioMap[row.solicitud_id]?.precio      ?? null,
+        distancia_km:    precioMap[row.solicitud_id]?.distanciaKm ?? null,
+        tarifa_cop_km:   resumen.tarifaCopKm,
+        total_conductor: resumen.totalConductor,
+        resumen_precio:  resumen.resumen,
+      })), 'Viajes obtenidos');
+    } catch { /* devolver sin precios si falla el cálculo */ }
+  }
 
-    if (userRole === ROLES.CONDUCTOR && result.rows.length > 0) {
-      try {
-        const resumen   = await calcularResumenConductor(userId, pool);
-        const precioMap = Object.fromEntries(resumen.pasajeros.map(p => [p.solicitud_id, p]));
-        return res.json(result.rows.map(row => ({
-          ...row,
-          precio_pasajero: precioMap[row.solicitud_id]?.precio      ?? null,
-          distancia_km:    precioMap[row.solicitud_id]?.distanciaKm ?? null,
-          tarifa_cop_km:   resumen.tarifaCopKm,
-          total_conductor: resumen.totalConductor,
-          resumen_precio:  resumen.resumen,
-        })));
-      } catch { /* devolver sin precios si falla */ }
-    }
+  ok(res, rows, 'Viajes obtenidos');
+});
 
-    res.json(result.rows);
-  } catch (err) { next(err); }
-}
+export const getViajeById = asyncHandler(async (req, res) => {
+  const { id: userId, role: userRole } = req.user;
+  const esConductor = userRole === ROLES.CONDUCTOR;
 
-// ── Detalle de un viaje ───────────────────────────────────────────────────────
+  const queryText = esConductor
+    ? `SELECT ${VIAJE_FIELDS_CONDUCTOR} FROM solicitudes s
+       JOIN users p ON p.id = s.pasajero_id
+       LEFT JOIN horarios h ON h.user_id = s.conductor_id
+       WHERE s.id=$1 AND s.conductor_id=$2`
+    : `SELECT ${VIAJE_FIELDS_PASAJERO} FROM solicitudes s
+       JOIN users c ON c.id = s.conductor_id
+       LEFT JOIN horarios h ON h.user_id = s.conductor_id
+       WHERE s.id=$1 AND s.pasajero_id=$2`;
 
-export async function getViajeById(req, res, next) {
-  try {
-    const { id: userId, role: userRole } = req.user;
-    let result;
+  const { rows } = await pool.query(queryText, [req.params.id, userId]);
+  if (!rows.length) throw AppError.notFound('Viaje no encontrado', 'VIAJE_NOT_FOUND');
 
-    if (userRole === ROLES.CONDUCTOR) {
-      result = await pool.query(`
-        SELECT
-          s.id AS solicitud_id, s.estado, s.fecha_viaje, s.created_at,
-          p.id AS pasajero_id, p.name AS pasajero_name,
-          p.city AS pasajero_city, p.university AS pasajero_university,
-          p.phone AS pasajero_phone,
-          s.pickup_lat, s.pickup_lon, s.pickup_name,
-          s.pickup_direccion, s.pickup_universidad,
-          s.destino_lat, s.destino_lon,
-          COALESCE(h.schedule, '{}') AS schedule,
-          COALESCE(h.routes,   '{}') AS routes,
-          COALESCE(h.precio,   '{}') AS precio
-        FROM solicitudes s
-        JOIN users p ON p.id = s.pasajero_id
-        LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.id=$1 AND s.conductor_id=$2
-      `, [req.params.id, userId]);
-    } else {
-      result = await pool.query(`
-        SELECT
-          s.id AS solicitud_id, s.estado, s.fecha_viaje, s.created_at,
-          c.id AS conductor_id, c.name AS conductor_name,
-          c.city AS conductor_city, c.car_model, c.plate,
-          c.vehicle_type, c.phone AS conductor_phone,
-          COALESCE(h.schedule, '{}') AS schedule,
-          COALESCE(h.routes,   '{}') AS routes,
-          COALESCE(h.precio,   '{}') AS precio
-        FROM solicitudes s
-        JOIN users c ON c.id = s.conductor_id
-        LEFT JOIN horarios h ON h.user_id = s.conductor_id
-        WHERE s.id=$1 AND s.pasajero_id=$2
-      `, [req.params.id, userId]);
-    }
-
-    if (!result.rows.length) return res.status(404).json({ message: 'Viaje no encontrado' });
-    res.json(result.rows[0]);
-  } catch (err) { next(err); }
-}
+  ok(res, rows[0], 'Viaje obtenido');
+});
