@@ -156,7 +156,7 @@ const authStore = useAuthStore();
 const myId = computed(() => authStore.user?.id);
 const isConductor = computed(() => authStore.user?.role === 'conductor');
 
-const API = 'https://gotogether-nhuj.onrender.com';
+const API = 'https://gotogether-api.onrender.com';
 const pendientesCount = ref(0);
 
 async function fetchPendientesCount() {
