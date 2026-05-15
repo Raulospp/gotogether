@@ -1,5 +1,5 @@
 import { SolicitudRepository } from '../repositories/solicitud.repository.js';
-import { reverseGeocode }      from './routing.js';
+import { reverseGeocode }      from '../utils/routing.js';
 import { AppError }            from '../utils/AppError.js';
 import { ROLES, ESTADOS, MSG } from '../constants/index.js';
 

@@ -32,3 +32,12 @@ export const secondsToMin = (s) => parseFloat((s / 60).toFixed(1));
 
 // ─── Redondear COP al $100 más cercano ───────────────────────────────────────
 export const roundCOP = (value) => Math.round(value / 100) * 100;
+// ─── Formateo monetario COP ───────────────────────────────────────────────────
+/** Formatea un valor numérico como moneda COP: $1.500 */
+export function formatCOP(value) {
+  return new Intl.NumberFormat('es-CO', {
+    style:                 'currency',
+    currency:              'COP',
+    maximumFractionDigits: 0,
+  }).format(value);
+}

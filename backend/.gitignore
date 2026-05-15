@@ -3,9 +3,7 @@ node_modules/
 
 # ─── Variables de entorno (¡NUNCA subir al repo!) ────────
 .env
-.env.*
-!.env.example
-
+backend/.env
 # ─── Logs ────────────────────────────────────────────────
 logs/
 *.log

@@ -1,31 +1,28 @@
 import crypto from 'crypto';
 import jwt    from 'jsonwebtoken';
-import { pool }  from '../config/db.js';
-import { TOKEN } from '../constants/index.js';
-
-const SECRET = process.env.JWT_SECRET || 'cambiame_en_produccion';
+import { pool }       from '../config/db.js';
+import { JWT_SECRET } from '../config/jwt.js';
+import { TOKEN }      from '../constants/index.js';
 
 // ─── Access token (JWT, 15 min) ───────────────────────────────────────────────
 
 export function signAccessToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role },
-    SECRET,
+    JWT_SECRET,
     { expiresIn: TOKEN.ACCESS_TTL },
   );
 }
 
 export function verifyJwt(token) {
-  return jwt.verify(token, SECRET); // lanza si es inválido o expirado
+  return jwt.verify(token, JWT_SECRET);
 }
 
 // ─── Refresh token (opaco, 30 días, persiste en DB) ──────────────────────────
 
 export async function createRefreshToken(userId, device = null) {
   const token     = crypto.randomBytes(TOKEN.REFRESH_BYTES).toString('hex');
-  const expiresAt = new Date(
-    Date.now() + TOKEN.REFRESH_DAYS * 24 * 60 * 60 * 1000,
-  );
+  const expiresAt = new Date(Date.now() + TOKEN.REFRESH_DAYS * 24 * 60 * 60 * 1000);
 
   await pool.query(
     'INSERT INTO refresh_tokens (user_id, token, device, expires_at) VALUES ($1,$2,$3,$4)',

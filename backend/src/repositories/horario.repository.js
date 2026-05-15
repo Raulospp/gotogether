@@ -26,24 +26,8 @@ export const HorarioRepository = {
     return rows[0]?.precio ?? null;
   },
 
-  upsert: async (userId, { schedule, routes, precio }) => {
-    const fields = [];
-    const values = [userId];
-
-    if (schedule !== undefined) { fields.push(`schedule=$${values.push(JSON.stringify(schedule))}`); }
-    if (routes   !== undefined) { fields.push(`routes=$${values.push(JSON.stringify(routes))}`);   }
-    if (precio   !== undefined) { fields.push(`precio=$${values.push(JSON.stringify(precio))}`);   }
-
-    fields.push(`updated_at=NOW()`);
-
-    await pool.query(`
-      INSERT INTO horarios (user_id, ${['schedule','routes','precio'].filter((_,i) => [schedule,routes,precio][i] !== undefined).join(',')}, updated_at)
-      VALUES ($1, ${values.slice(1).map((_,i) => `$${i+2}`).join(',')}, NOW())
-      ON CONFLICT (user_id) DO UPDATE SET ${fields.join(',')}
-    `, values);
-  },
-
-  upsertFull: async (userId, schedule, routes, precio) => {
+  // ── Upsert completo de los 3 campos (POST /horarios) ──────────────────────
+  upsertFull: async (userId, { schedule = {}, routes = {}, precio = {} } = {}) => {
     await pool.query(`
       INSERT INTO horarios (user_id, schedule, routes, precio, updated_at)
       VALUES ($1, $2, $3, $4, NOW())
@@ -52,6 +36,32 @@ export const HorarioRepository = {
     `, [userId, JSON.stringify(schedule), JSON.stringify(routes), JSON.stringify(precio)]);
   },
 
+  // ── Upsert parcial: solo actualiza los campos provistos ───────────────────
+  upsertParcial: async (userId, fields) => {
+    const setClauses = [];
+    const values     = [userId];
+
+    if (fields.schedule !== undefined)
+      setClauses.push(`schedule=$${values.push(JSON.stringify(fields.schedule))}`);
+    if (fields.routes !== undefined)
+      setClauses.push(`routes=$${values.push(JSON.stringify(fields.routes))}`);
+    if (fields.precio !== undefined)
+      setClauses.push(`precio=$${values.push(JSON.stringify(fields.precio))}`);
+
+    if (!setClauses.length) return;
+    setClauses.push('updated_at=NOW()');
+
+    const colNames       = Object.keys(fields).filter(k => ['schedule','routes','precio'].includes(k));
+    const colPlaceholders = values.slice(1).map((_, i) => `$${i + 2}`).join(',');
+
+    await pool.query(`
+      INSERT INTO horarios (user_id, ${colNames.join(',')}, updated_at)
+      VALUES ($1, ${colPlaceholders}, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET ${setClauses.join(',')}
+    `, values);
+  },
+
+  // ── Shortcuts semánticos ──────────────────────────────────────────────────
   upsertRoutes: async (userId, routes) => {
     await pool.query(`
       INSERT INTO horarios (user_id, routes, updated_at)

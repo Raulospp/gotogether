@@ -1,18 +1,4 @@
-import { HTTP } from '../constants/index.js';
-
-function validate(rules) {
-  return (req, res, next) => {
-    const errors = [];
-    for (const rule of rules) {
-      const err = rule(req);
-      if (err) errors.push(err);
-    }
-    if (errors.length) {
-      return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Datos de entrada inválidos', errors });
-    }
-    next();
-  };
-}
+import { validate } from './common.validator.js';
 
 const isValidFloat  = (val, min, max) => val != null && !isNaN(Number(val)) && Number(val) >= min && Number(val) <= max;
 const isPositiveInt = (val)           => Number.isInteger(Number(val)) && Number(val) > 0;

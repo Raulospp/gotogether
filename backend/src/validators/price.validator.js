@@ -1,28 +1,10 @@
-import { HTTP } from '../constants/index.js';
-
-function validate(rules) {
-  return (req, res, next) => {
-    const errors = [];
-    for (const rule of rules) {
-      const err = rule(req);
-      if (err) errors.push(err);
-    }
-    if (errors.length) {
-      return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Datos de entrada inválidos', errors });
-    }
-    next();
-  };
-}
+import { validate, rules } from './common.validator.js';
 
 const isPositiveInt = (val) => Number.isInteger(Number(val)) && Number(val) > 0;
 const isValidFloat  = (val, min, max) => val != null && !isNaN(Number(val)) && Number(val) >= min && Number(val) <= max;
 
 export const validateSetTarifa = validate([
-  (req) => {
-    const v = Number(req.body.tarifa_cop_km);
-    return (!req.body.tarifa_cop_km || isNaN(v) || v <= 0)
-      ? { field: 'tarifa_cop_km', message: 'tarifa_cop_km debe ser un número mayor a 0' } : null;
-  },
+  rules.isPositiveFloat('tarifa_cop_km', 'tarifa_cop_km'),
 ]);
 
 export const validateTarifaConductorQuery = validate([

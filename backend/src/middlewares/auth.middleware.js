@@ -1,15 +1,9 @@
 import jwt from 'jsonwebtoken';
-import { logger } from '../config/logger.js';
-import { HTTP, MSG } from '../constants/index.js';
-import { fail } from '../utils/response.js';
+import { JWT_SECRET } from '../config/jwt.js';
+import { HTTP, MSG }  from '../constants/index.js';
+import { fail }       from '../utils/response.js';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET) {
-  logger.warn('JWT_SECRET no está definido en .env — la aplicación no es segura');
-}
-
-const SECRET = JWT_SECRET || 'cambiame_en_produccion';
+// ─── Autenticación JWT ────────────────────────────────────────────────────────
 
 export function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -19,7 +13,7 @@ export function authMiddleware(req, res, next) {
   }
 
   try {
-    req.user = jwt.verify(authHeader.split(' ')[1], SECRET);
+    req.user = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
     next();
   } catch (err) {
     const isExpired = err.name === 'TokenExpiredError';
@@ -27,12 +21,13 @@ export function authMiddleware(req, res, next) {
       res,
       HTTP.UNAUTHORIZED,
       isExpired ? MSG.EXPIRED_TOKEN : MSG.INVALID_TOKEN,
-      isExpired ? 'EXPIRED_TOKEN' : 'INVALID_TOKEN',
+      isExpired ? 'EXPIRED_TOKEN'  : 'INVALID_TOKEN',
     );
   }
 }
 
-/** Middleware de autorización por rol */
+// ─── Autorización por rol ─────────────────────────────────────────────────────
+
 export function requireRole(...roles) {
   return (req, res, next) => {
     if (!roles.includes(req.user?.role)) {

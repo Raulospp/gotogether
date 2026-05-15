@@ -99,4 +99,16 @@ export const UserRepository = {
     `, [excludeUserId, excludeUserId]);
     return rows;
   },
+
+  // ── Para price.controller: tarifa del conductor con su nombre ─────────────
+  findTarifaConNombre: async (conductorId) => {
+    const { rows } = await pool.query(
+      `SELECT h.precio, u.name
+       FROM horarios h
+       JOIN users u ON u.id = h.user_id
+       WHERE h.user_id=$1`,
+      [conductorId],
+    );
+    return rows[0] ?? null;
+  },
 };

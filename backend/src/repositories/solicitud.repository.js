@@ -1,4 +1,5 @@
-import { pool } from '../config/db.js';
+import { pool }    from '../config/db.js';
+import { ESTADOS } from '../constants/index.js';
 
 export const SolicitudRepository = {
 
@@ -74,7 +75,11 @@ export const SolicitudRepository = {
   },
 
   updatePickup: async (id, userId, pickupData) => {
-    const { pickup_lat, pickup_lon, pickup_name, pickup_direccion, pickup_universidad, destino_lat, destino_lon } = pickupData;
+    const {
+      pickup_lat, pickup_lon, pickup_name,
+      pickup_direccion, pickup_universidad,
+      destino_lat, destino_lon,
+    } = pickupData;
     const { rows } = await pool.query(`
       UPDATE solicitudes
       SET pickup_lat=$1, pickup_lon=$2, pickup_name=$3,
@@ -82,7 +87,35 @@ export const SolicitudRepository = {
           destino_lat=$6, destino_lon=$7
       WHERE id=$8 AND (pasajero_id=$9 OR conductor_id=$9)
       RETURNING id
-    `, [pickup_lat, pickup_lon, pickup_name, pickup_direccion, pickup_universidad, destino_lat, destino_lon, id, userId]);
+    `, [pickup_lat, pickup_lon, pickup_name, pickup_direccion, pickup_universidad,
+        destino_lat, destino_lon, id, userId]);
+    return rows[0] ?? null;
+  },
+
+  // ── Para maps.controller: pickup de un pasajero en viaje aceptado ─────────
+  findPickupBySolicitudAndConductor: async (solicitudId, conductorId) => {
+    const { rows } = await pool.query(`
+      SELECT s.pickup_lat, s.pickup_lon, s.pickup_name,
+             p.name AS pasajero_name, p.phone AS pasajero_phone
+      FROM solicitudes s
+      JOIN users p ON p.id = s.pasajero_id
+      WHERE s.id=$1 AND s.conductor_id=$2 AND s.estado=$3
+    `, [solicitudId, conductorId, ESTADOS.ACEPTADA]);
+    return rows[0] ?? null;
+  },
+
+  // ── Para price.controller: solicitud con config de precio del conductor ───
+  findSolicitudConPrecio: async (solicitudId, pasajeroId) => {
+    const { rows } = await pool.query(`
+      SELECT
+        s.id AS solicitud_id, s.pickup_lat, s.pickup_lon,
+        s.destino_lat, s.destino_lon, s.pickup_direccion, s.pickup_universidad,
+        h.precio AS conductor_precio, c.name AS conductor_name
+      FROM solicitudes s
+      JOIN users c ON c.id = s.conductor_id
+      LEFT JOIN horarios h ON h.user_id = s.conductor_id
+      WHERE s.id=$1 AND s.pasajero_id=$2
+    `, [solicitudId, pasajeroId]);
     return rows[0] ?? null;
   },
 };

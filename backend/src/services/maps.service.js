@@ -1,7 +1,8 @@
-import { logger } from '../config/logger.js';
-import { haversine }              from '../utils/geo.js';
+import { pool }    from '../config/db.js';
+import { logger }  from '../config/logger.js';
+import { haversine }                              from '../utils/geo.js';
 import { normalizeText, metersToKm, secondsToMin } from '../utils/format.js';
-import { EXTERNAL, LIMITS }      from '../constants/index.js';
+import { EXTERNAL, LIMITS }                       from '../constants/index.js';
 
 // ─── Geocodificación ──────────────────────────────────────────────────────────
 
@@ -111,14 +112,16 @@ function matchesByGeo(driver, destCoords, radiusKm) {
   const polyline = driver.routes?.polyline;
   if (!destCoords || !polyline?.length) return { match: false, distance: null };
 
-  const driverEnd  = polyline[polyline.length - 1];
-  const distance   = parseFloat(haversine(destCoords, driverEnd).toFixed(2));
+  const driverEnd = polyline[polyline.length - 1];
+  const distance  = parseFloat(haversine(destCoords, driverEnd).toFixed(2));
   return { match: distance <= radiusKm, distance };
 }
 
-export async function getSuggestedDrivers(destinationQuery, pool, radiusKm = LIMITS.GEO_RADIUS_KM) {
+/**
+ * Pool se importa directamente — ya no se pasa como parámetro.
+ */
+export async function getSuggestedDrivers(destinationQuery, radiusKm = LIMITS.GEO_RADIUS_KM) {
   if (!destinationQuery?.trim()) throw new Error('destinationQuery es requerido');
-  if (!pool)                      throw new Error('pool es requerido');
 
   let destCoords = null;
   try {
@@ -149,6 +152,7 @@ export async function getSuggestedDrivers(destinationQuery, pool, radiusKm = LIM
   const queryNorm  = normalizeText(destinationQuery);
   const queryWords = queryNorm.split(/\s+/).filter((w) => w.length > LIMITS.MIN_WORD_LENGTH);
 
+  const RANK    = { both: 0, geo: 1, text: 2 };
   const results = [];
 
   for (const driver of drivers) {
@@ -159,18 +163,14 @@ export async function getSuggestedDrivers(destinationQuery, pool, radiusKm = LIM
 
     if (!textMatch && !geoResult.match) continue;
 
-    results.push(
-      buildDriverResult(driver, textMatch, geoResult.match, geoResult.distance),
-    );
+    results.push(buildDriverResult(driver, textMatch, geoResult.match, geoResult.distance));
   }
 
-  const RANK = { both: 0, geo: 1, text: 2 };
   results.sort((a, b) => {
     const byRank = RANK[a.matchType] - RANK[b.matchType];
     if (byRank !== 0) return byRank;
-    if (a.distanceToDestinationKm != null && b.distanceToDestinationKm != null) {
+    if (a.distanceToDestinationKm != null && b.distanceToDestinationKm != null)
       return a.distanceToDestinationKm - b.distanceToDestinationKm;
-    }
     return 0;
   });
 

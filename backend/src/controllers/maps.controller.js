@@ -1,12 +1,12 @@
-import { HorarioRepository }    from '../repositories/horario.repository.js';
-import { SolicitudRepository }  from '../repositories/solicitud.repository.js';
+import { HorarioRepository }   from '../repositories/horario.repository.js';
+import { SolicitudRepository } from '../repositories/solicitud.repository.js';
 import { getCoordinates, getRouteWithPassengers, getSuggestedDrivers } from '../services/maps.service.js';
-import { snapToRoad, reverseGeocode }  from '../services/routing.js';
-import { isPassengerOnRoute, findPickupPoint } from '../utils/geo.js';
-import { asyncHandler }         from '../utils/async-handler.js';
-import { ok, fail }             from '../utils/response.js';
-import { AppError }             from '../utils/AppError.js';
-import { ROLES, ESTADOS, LIMITS, HTTP } from '../constants/index.js';
+import { snapToRoad, reverseGeocode }            from '../utils/routing.js';
+import { isPassengerOnRoute, findPickupPoint }   from '../utils/geo.js';
+import { asyncHandler }  from '../utils/async-handler.js';
+import { ok, fail }      from '../utils/response.js';
+import { AppError }      from '../utils/AppError.js';
+import { ROLES, LIMITS, HTTP } from '../constants/index.js';
 
 export const geocodeGet = asyncHandler(async (req, res) => {
   const q = req.query.q?.trim();
@@ -26,8 +26,10 @@ export const saveRoute = asyncHandler(async (req, res) => {
   const routeData = await getRouteWithPassengers(origin, destination, passengerPickups);
 
   await HorarioRepository.upsertRoutes(req.user.id, {
-    polyline: routeData.polyline, distanceKm: routeData.distanceKm,
-    durationMin: routeData.durationMin, legs: routeData.legs,
+    polyline:    routeData.polyline,
+    distanceKm:  routeData.distanceKm,
+    durationMin: routeData.durationMin,
+    legs:        routeData.legs,
     origin, destination, passengerPickups,
   });
 
@@ -41,7 +43,8 @@ export const saveRoute = asyncHandler(async (req, res) => {
 
 export const getRoute = asyncHandler(async (req, res) => {
   const routes = await HorarioRepository.findRoutesByUserId(req.params.conductorId);
-  if (!routes?.polyline) throw AppError.notFound('Este conductor no tiene ruta guardada', 'ROUTE_NOT_FOUND');
+  if (!routes?.polyline)
+    throw AppError.notFound('Este conductor no tiene ruta guardada', 'ROUTE_NOT_FOUND');
 
   const { polyline, distanceKm, durationMin, legs } = routes;
   ok(res, { polyline, distanceKm, durationMin, legs }, 'Ruta obtenida');
@@ -52,11 +55,11 @@ export const getSuggestedDriversHandler = asyncHandler(async (req, res) => {
     throw AppError.forbidden('Solo pasajeros pueden buscar conductores', 'FORBIDDEN_ROLE');
 
   const { destination, radius } = req.query;
-  if (!destination) return fail(res, HTTP.BAD_REQUEST, 'destination es requerido', 'MISSING_PARAM');
+  if (!destination)
+    return fail(res, HTTP.BAD_REQUEST, 'destination es requerido', 'MISSING_PARAM');
 
   const radiusKm = parseFloat(radius) || LIMITS.GEO_RADIUS_KM;
-  const { pool }  = await import('../config/db.js');
-  const drivers  = await getSuggestedDrivers(destination, pool, radiusKm);
+  const drivers  = await getSuggestedDrivers(destination, radiusKm);
 
   ok(res, { query: destination, total: drivers.length, drivers }, 'Conductores sugeridos');
 });
@@ -65,7 +68,8 @@ export const validatePickup = asyncHandler(async (req, res) => {
   const { conductorId, pickupPoint, toleranceKm = LIMITS.GEO_TOLERANCE_KM } = req.body;
 
   const routes = await HorarioRepository.findRoutesByUserId(conductorId);
-  if (!routes?.polyline) throw AppError.notFound('El conductor no tiene ruta guardada', 'ROUTE_NOT_FOUND');
+  if (!routes?.polyline)
+    throw AppError.notFound('El conductor no tiene ruta guardada', 'ROUTE_NOT_FOUND');
 
   const validation   = isPassengerOnRoute(pickupPoint, routes.polyline, toleranceKm);
   const pickupRaw    = findPickupPoint(pickupPoint, routes.polyline);
@@ -90,7 +94,9 @@ export const savePickup = asyncHandler(async (req, res) => {
     pickup_direccion: '', pickup_universidad: '', destino_lat: null, destino_lon: null,
   });
 
-  if (!updated) throw AppError.notFound('Solicitud no encontrada o no aceptada', 'SOLICITUD_NOT_FOUND');
+  if (!updated)
+    throw AppError.notFound('Solicitud no encontrada o no aceptada', 'SOLICITUD_NOT_FOUND');
+
   ok(res, { pickupName }, 'Punto de recogida guardado');
 });
 
@@ -98,16 +104,18 @@ export const getMyPickup = asyncHandler(async (req, res) => {
   if (req.user.role !== ROLES.CONDUCTOR)
     throw AppError.forbidden('Solo conductores pueden consultar pickups', 'FORBIDDEN_ROLE');
 
-  const { pool } = await import('../config/db.js');
-  const { rows } = await pool.query(`
-    SELECT s.pickup_lat, s.pickup_lon, s.pickup_name,
-           p.name AS pasajero_name, p.phone AS pasajero_phone
-    FROM solicitudes s JOIN users p ON p.id = s.pasajero_id
-    WHERE s.id=$1 AND s.conductor_id=$2 AND s.estado=$3
-  `, [req.params.solicitudId, req.user.id, ESTADOS.ACEPTADA]);
+  const pickup = await SolicitudRepository.findPickupBySolicitudAndConductor(
+    req.params.solicitudId, req.user.id,
+  );
+  if (!pickup)
+    throw AppError.notFound('Solicitud no encontrada', 'SOLICITUD_NOT_FOUND');
 
-  if (!rows.length) throw AppError.notFound('Solicitud no encontrada', 'SOLICITUD_NOT_FOUND');
-
-  const { pasajero_name, pasajero_phone, pickup_lat, pickup_lon, pickup_name } = rows[0];
-  ok(res, { pasajero: pasajero_name, phone: pasajero_phone, pickupLat: pickup_lat, pickupLon: pickup_lon, pickupName: pickup_name }, 'Pickup obtenido');
+  const { pasajero_name, pasajero_phone, pickup_lat, pickup_lon, pickup_name } = pickup;
+  ok(res, {
+    pasajero:   pasajero_name,
+    phone:      pasajero_phone,
+    pickupLat:  pickup_lat,
+    pickupLon:  pickup_lon,
+    pickupName: pickup_name,
+  }, 'Pickup obtenido');
 });
