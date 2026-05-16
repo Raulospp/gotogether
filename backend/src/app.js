@@ -7,14 +7,14 @@ import { waitForDB, initDB } from './utils/db.js';
 import { errorHandler }      from './middlewares/error.middleware.js';
 import { LIMITS }            from './constants/index.js';
 
-import healthRouter     from './routes/health.js';
-import authRouter       from './routes/auth.js';
-import usersRouter      from './routes/users.js';
-import solicitudesRouter from './routes/solicitudes.js';
-import viajesRouter     from './routes/viajes.js';
-import horariosRouter   from './routes/horarios.js';
-import mapsRouter       from './routes/maps.js';
-import pricingRouter    from './routes/price.js';
+import healthRouter     from './routes/health.route.js';
+import authRouter       from './routes/auth.route.js';
+import usersRouter      from './routes/users.route.js';
+import solicitudesRouter from './routes/solicitudes.route.js';
+import viajesRouter     from './routes/viajes.route.js';
+import horariosRouter   from './routes/horarios.route.js';
+import mapsRouter       from './routes/maps.route.js';
+import pricingRouter    from './routes/price.route.js';
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
