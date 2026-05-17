@@ -751,3 +751,5 @@ async function responderSolicitud(id: number, estado: string) {
 }
 
 </style>
+
+

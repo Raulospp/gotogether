@@ -348,3 +348,5 @@ function showToast(msg: string, type: 'success'|'error' = 'success') {
 .nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #a32020; margin-top: -2px; }
 .nav-badge { position: absolute; top: 2px; right: 14px; background: #a32020; color: #ede9e6; border-radius: 10px; font-size: 8px; font-weight: 700; padding: 1px 5px; min-width: 14px; text-align: center; }
 </style>
+
+

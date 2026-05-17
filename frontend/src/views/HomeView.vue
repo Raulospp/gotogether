@@ -522,3 +522,5 @@ function handleLogout() { authStore.logout(); router.replace('/welcome'); }
 .nav-item.active { color: #a32020; }
 .nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #a32020; margin-top: -2px; }
 </style>
+
+

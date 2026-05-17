@@ -429,3 +429,5 @@ onUnmounted(() => { map = null; });
 .spin-sm { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(237,233,230,0.3); border-top-color: #ede9e6; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+
+

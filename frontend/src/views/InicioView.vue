@@ -143,21 +143,19 @@
         <div v-else v-for="v in viajesHoy" :key="v.viaje_id || v.solicitud_id" class="viaje-card" @click="router.push(`/viaje/${v.viaje_id || v.solicitud_id}`)">
           <!-- Header del viaje -->
           <div class="viaje-top">
-            <div v-if="isConductor" class="viaje-avatar viaje-avatar-multi" style="background:linear-gradient(135deg,#8B1A1A,#4a0e0e)">
-              {{ v.pasajeros?.length || 0 }}
+            <div v-if="isConductor" class="viaje-avatar" :style="`background:${avatarColor(v.pasajero_name || 'P')}`">
+              {{ initial(v.pasajero_name || 'P') }}
             </div>
             <div v-else class="viaje-avatar" :style="`background:${avatarColor(v.conductor_name)}`">
               {{ initial(v.conductor_name) }}
             </div>
             <div class="viaje-info">
               <div class="viaje-name">
-                {{ isConductor
-                  ? (v.pasajeros?.length === 1 ? v.pasajeros[0].pasajero_name : `${v.pasajeros?.length || 0} pasajeros`)
-                  : v.conductor_name }}
+                {{ isConductor ? (v.pasajero_name || 'Pasajero') : v.conductor_name }}
               </div>
               <div class="viaje-sub">
                 {{ isConductor
-                  ? (getDestinosViaje(v) || 'Sin destinos aún')
+                  ? (v.pickup_universidad || v.pasajero_university || 'Sin universidad')
                   : `${v.car_model} · ${v.conductor_city}` }}
               </div>
             </div>
@@ -199,6 +197,11 @@
             </div>
 
             <!-- WhatsApp -->
+            <!-- Pickup del pasajero (conductor) -->
+            <div v-if="isConductor && v.pickup_direccion" class="viaje-pickup-row">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              {{ v.pickup_direccion }}
+            </div>
             <button v-if="(isConductor ? v.pasajero_phone : v.conductor_phone)" class="btn-wpp-viaje"
               @click.stop="wppViaje(isConductor ? v.pasajero_phone : v.conductor_phone)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.853L0 24l6.335-1.521A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.645-.52-5.148-1.422l-.369-.218-3.763.904.937-3.666-.242-.381A9.96 9.96 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
@@ -568,6 +571,7 @@ function showToast(msg: string, type: 'success'|'error' = 'success') {
 .vstop-label { font-size: 12px; color: rgba(237,233,230,0.65); }
 .viaje-precio-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4px; font-size: 12px; color: rgba(237,233,230,0.4); }
 .precio-val { font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: #25d366; }
+.viaje-pickup-row { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: rgba(237,233,230,0.5); padding: 4px 0 8px; font-family: 'DM Sans', sans-serif; }
 .btn-wpp-viaje { width: 100%; margin-top: 10px; padding: 10px; background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.22); border-radius: 10px; color: #25d366; font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

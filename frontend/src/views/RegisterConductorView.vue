@@ -170,3 +170,5 @@ async function handleRegister() {
 .btn-fill { display: flex; align-items: center; justify-content: space-between; padding: 17px 20px; width: 100%; background: #8B1A1A; border: none; border-radius: 16px; color: #ede9e6; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 28px rgba(139,26,26,0.4); }
 .btn-fill:disabled { opacity: 0.6; }
 </style>
+
+

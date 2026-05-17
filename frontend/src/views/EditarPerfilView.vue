@@ -210,3 +210,5 @@ async function handleSave() {
 .btn-save { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 16px; background: #8B1A1A; border: none; border-radius: 14px; color: #ede9e6; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(139,26,26,0.4); margin-top: 8px; }
 .btn-save:disabled { opacity: 0.6; }
 </style>
+
+

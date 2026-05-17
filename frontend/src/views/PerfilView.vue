@@ -392,3 +392,5 @@ async function enviarSolicitud() {
 .toast.success { border-color: rgba(37,211,102,0.3); color: #25d366; }
 .toast.error { border-color: rgba(139,26,26,0.28); color: #a32020; }
 </style>
+
+
