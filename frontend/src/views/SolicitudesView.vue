@@ -146,7 +146,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { useAuthStore } from '@/stores/authStore';
@@ -186,7 +186,13 @@ async function fetchSolicitudes() {
   finally { loading.value = false; }
 }
 
-onMounted(() => { fetchSolicitudes(); fetchPendientesCount(); });
+let _poll: any = null;
+onMounted(() => {
+  fetchSolicitudes();
+  fetchPendientesCount();
+  _poll = setInterval(() => { fetchSolicitudes(); fetchPendientesCount(); }, 6000);
+});
+onUnmounted(() => { if (_poll) clearInterval(_poll); });
 
 // Recibidas: yo NO la inicié
 const recibidas = computed(() =>

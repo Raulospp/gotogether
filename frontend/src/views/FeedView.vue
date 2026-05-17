@@ -85,6 +85,11 @@
             </div>
           </div>
 
+          <div v-if="!isConductor && getPrecio(u)" class="precio-hoy-row">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <span class="precio-hoy-val">{{ getPrecio(u) }}</span>
+            <span class="precio-hoy-lbl">precio hoy</span>
+          </div>
           <div class="card-bottom">
             <div class="compat">
               <div class="compat-dot" :class="getHorario(u,'ida') ? 'on' : 'off'"></div>
@@ -344,6 +349,10 @@ onMounted(() => {
 
 function getHorario(u: any, tipo: 'ida' | 'vuelta') {
   return u.schedule?.[diaHoy]?.[tipo] || '';
+}
+function getPrecio(u: any) {
+  const p = u.precio?.[diaHoy];
+  return p ? `$${Number(p).toLocaleString('es-CO')}` : '';
 }
 
 function initial(name: string) { return name?.charAt(0).toUpperCase() || '?'; }
@@ -605,6 +614,9 @@ async function responderSolicitud(id: number, estado: string) {
 .sched-chip { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 3px 9px; font-size: 10.5px; color: rgba(237,233,230,0.45); }
 .sched-chip.on { background: rgba(139,26,26,0.14); border-color: rgba(139,26,26,0.28); color: #a32020; font-weight: 600; }
 
+.precio-hoy-row { display: flex; align-items: center; gap: 6px; padding: 0 14px 10px; color: #25d366; font-family: 'DM Sans', sans-serif; font-size: 12.5px; }
+.precio-hoy-val { font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 14px; color: #25d366; }
+.precio-hoy-lbl { font-size: 10px; color: rgba(37,211,102,0.45); }
 .card-bottom { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 14px; gap: 8px; }
 .compat { display: flex; align-items: center; gap: 5px; font-size: 11px; color: rgba(237,233,230,0.38); }
 .compat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }

@@ -91,6 +91,7 @@ const props = defineProps<{
   pickups?: Pickup[];
   miSolicitudId?: number | null;
   altura?: number;
+  yaConfirmado?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -103,7 +104,7 @@ const emit = defineEmits<{
 const GKEY = 'AIzaSyBVta3wPBhLml0Jr87iM8ij5j134BMeqqo';
 const mapEl = ref<HTMLDivElement | null>(null);
 const cargando = ref(true);
-const ubicacionCompartida = ref(false);
+const ubicacionCompartida = ref(!!props.yaConfirmado);
 const enviando = ref(false);
 const previsualizando = ref(false);
 const rutaPrevisualizadaOk = ref(false);
@@ -399,6 +400,7 @@ async function init() {
 }
 
 watch(() => props.pickups, dibujar, { deep: true });
+watch(() => props.yaConfirmado, (v) => { if (v) ubicacionCompartida.value = true; });
 onMounted(init);
 onUnmounted(() => { map = null; });
 </script>

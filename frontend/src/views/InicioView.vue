@@ -88,7 +88,7 @@
             <div class="sol-sub">{{ isConductor ? s.pasajero_university : s.car_model }} · {{ isConductor ? s.pasajero_city : s.conductor_city }}</div>
           </div>
           <div v-if="isConductor" class="sol-btns">
-            <button class="sol-btn ok" @click="responder(s.id, 'aceptada')">✓</button>
+            <button class="sol-btn ok" @click="abrirModalPrecio(s.id)">✓</button>
             <button class="sol-btn no" @click="responder(s.id, 'rechazada')">✕</button>
           </div>
           <div v-else class="estado-pill">Pendiente</div>
@@ -140,24 +140,36 @@
           Sin viajes confirmados hoy
         </div>
 
-        <div v-else v-for="v in viajesHoy" :key="v.solicitud_id" class="viaje-card" @click="router.push(`/viaje/${v.solicitud_id}`)">
+        <div v-else v-for="v in viajesHoy" :key="v.viaje_id || v.solicitud_id" class="viaje-card" @click="router.push(`/viaje/${v.viaje_id || v.solicitud_id}`)">
           <!-- Header del viaje -->
           <div class="viaje-top">
-            <div class="viaje-avatar" :style="`background:${avatarColor(isConductor ? v.pasajero_name : v.conductor_name)}`">
-              {{ initial(isConductor ? v.pasajero_name : v.conductor_name) }}
+            <div v-if="isConductor" class="viaje-avatar viaje-avatar-multi" style="background:linear-gradient(135deg,#8B1A1A,#4a0e0e)">
+              {{ v.pasajeros?.length || 0 }}
+            </div>
+            <div v-else class="viaje-avatar" :style="`background:${avatarColor(v.conductor_name)}`">
+              {{ initial(v.conductor_name) }}
             </div>
             <div class="viaje-info">
-              <div class="viaje-name">{{ isConductor ? v.pasajero_name : v.conductor_name }}</div>
-              <div class="viaje-sub">{{ isConductor ? v.pasajero_university : v.car_model }} · {{ isConductor ? v.pasajero_city : v.conductor_city }}</div>
+              <div class="viaje-name">
+                {{ isConductor
+                  ? (v.pasajeros?.length === 1 ? v.pasajeros[0].pasajero_name : `${v.pasajeros?.length || 0} pasajeros`)
+                  : v.conductor_name }}
+              </div>
+              <div class="viaje-sub">
+                {{ isConductor
+                  ? (getDestinosViaje(v) || 'Sin destinos aún')
+                  : `${v.car_model} · ${v.conductor_city}` }}
+              </div>
             </div>
             <div class="viaje-right">
               <div v-if="getPrecioHoy(v)" class="viaje-precio">${{ getPrecioHoy(v) }}</div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="viajeAbierto === v.solicitud_id ? 'transform:rotate(180deg)' : ''"><polyline points="6 9 12 15 18 9"/></svg>
+              <div class="viaje-estado-chip" :class="`vest-${v.estado}`">{{ estadoViajeLabel(v.estado) }}</div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="viajeAbierto === (v.viaje_id || v.solicitud_id) ? 'transform:rotate(180deg)' : ''"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
           </div>
 
           <!-- Detalle expandible -->
-          <div v-if="viajeAbierto === v.solicitud_id" class="viaje-detail">
+          <div v-if="viajeAbierto === (v.viaje_id || v.solicitud_id)" class="viaje-detail">
             <div class="viaje-divider"></div>
 
             <!-- Horario del día -->
@@ -200,6 +212,21 @@
       </div>
 
       <!-- Toast -->
+      <!-- Modal precio al aceptar -->
+      <div v-if="precioModal.show" class="precio-overlay" @click.self="precioModal.show=false">
+        <div class="precio-modal">
+          <div class="pm-title">&#191;Cu&#225;nto cobras hoy?</div>
+          <div class="pm-sub">Define el precio para este pasajero</div>
+          <div class="pm-input-wrap">
+            <span class="pm-symbol">$</span>
+            <input v-model="precioModal.precio" type="number" placeholder="5000" class="pm-input" min="0" />
+          </div>
+          <div class="pm-btns">
+            <button class="pm-btn-skip" @click="responder(precioModal.solicitudId,'aceptada'); precioModal.show=false">Sin precio</button>
+            <button class="pm-btn-ok" @click="confirmarAceptar">Aceptar</button>
+          </div>
+        </div>
+      </div>
       <div class="toast" :class="{ show: toast.show, success: toast.type==='success', error: toast.type==='error' }">
         {{ toast.msg }}
       </div>
@@ -231,7 +258,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { useAuthStore } from '@/stores/authStore';
@@ -298,16 +325,21 @@ const viajeAbierto = ref<number|null>(null);
 async function fetchViajes() {
   loadingViajes.value = true;
   try {
-    // Limpiar viajes pasados primero
-    await fetch(`${API}/api/viajes/limpiar-pasados`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${getToken()}` }
-    }).catch(() => {});
-
     const res = await fetch(`${API}/api/viajes/mis-viajes`, {
       headers: { Authorization: `Bearer ${getToken()}` }
     });
-    if (res.ok) viajes.value = await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      // Normalizar precio/schedule si vienen como string
+      viajes.value = data.map((v: any) => ({
+        ...v,
+        schedule: typeof v.schedule === 'string' ? JSON.parse(v.schedule) : (v.schedule || {}),
+        precio:   typeof v.precio   === 'string' ? JSON.parse(v.precio)   : (v.precio   || {}),
+        routes:   typeof v.routes   === 'string' ? JSON.parse(v.routes)   : (v.routes   || {}),
+        pasajeros: (v.pasajeros || []),
+      }));
+      console.log('[fetchViajes] resultado:', JSON.stringify(viajes.value));
+    }
   } catch(e) { console.error(e); }
   finally { loadingViajes.value = false; }
 }
@@ -352,7 +384,19 @@ async function fetchFeed() {
   finally { loadingFeed.value = false; }
 }
 
-onMounted(() => { fetchSolicitudes(); fetchFeed(); fetchPendientesCount(); fetchViajes(); });
+let _poll: any = null;
+onMounted(() => {
+  fetchSolicitudes();
+  fetchFeed();
+  fetchPendientesCount();
+  fetchViajes();
+  _poll = setInterval(() => {
+    fetchSolicitudes();
+    fetchPendientesCount();
+    fetchViajes();
+  }, 6000);
+});
+onUnmounted(() => { if (_poll) clearInterval(_poll); });
 
 // ── Computeds ─────────────────────────────────────────────────────────────────
 const solicitudesPendientes = computed(() => solicitudes.value.filter(s => s.estado === 'pendiente'));
@@ -365,17 +409,37 @@ function initial(name: string) { return name?.charAt(0).toUpperCase() || '?'; }
 const avatarColors = ['linear-gradient(135deg,#8B1A1A,#4a0e0e)','linear-gradient(135deg,#1a3a8B,#0e1f4a)','linear-gradient(135deg,#1a6b3a,#0e3a1f)','linear-gradient(135deg,#6b1a6b,#3a0e3a)','linear-gradient(135deg,#2a2a6b,#1a1a3a)','linear-gradient(135deg,#5a3a1a,#3a200e)'];
 function avatarColor(name: string) { return avatarColors[(name?.charCodeAt(0)||0) % avatarColors.length]; }
 
+function estadoViajeLabel(e: string) {
+  const m: Record<string,string> = { pendiente:'Pendiente', aceptada:'Confirmado', en_curso:'En camino', finalizada:'Finalizado' };
+  return m[e] || e;
+}
+function getDestinosViaje(v: any): string {
+  if (!v.pasajeros?.length) return '';
+  const unis: string[] = v.pasajeros
+    .map((p: any) => (p.pickup_universidad || p.pasajero_university || '') as string)
+    .filter((x: string) => x);
+  return [...new Set(unis)].join(' · ');
+}
 function verPerfil(u: any) {
   const role = isConductor.value ? 'pasajero' : 'conductor';
   router.push(`/perfil/${role}/${u.id}`);
 }
 
-async function responder(id: number, estado: string) {
+// Modal de precio al aceptar
+const precioModal = ref({ show: false, solicitudId: 0, precio: '' });
+function abrirModalPrecio(id: number) {
+  precioModal.value = { show: true, solicitudId: id, precio: '' };
+}
+async function confirmarAceptar() {
+  await responder(precioModal.value.solicitudId, 'aceptada', precioModal.value.precio);
+  precioModal.value.show = false;
+}
+async function responder(id: number, estado: string, precio?: string) {
   try {
     const res = await fetch(`${API}/api/solicitudes/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-      body: JSON.stringify({ estado }),
+      body: JSON.stringify({ estado, ...(precio ? { precio_viaje: parseInt(precio) } : {}) }),
     });
     if (res.ok) {
       showToast(estado === 'aceptada' ? '¡Solicitud aceptada!' : 'Solicitud rechazada', estado === 'aceptada' ? 'success' : 'error');
@@ -475,6 +539,13 @@ function showToast(msg: string, type: 'success'|'error' = 'success') {
 .viaje-dia-badge.hoy { background: rgba(139,26,26,0.2); border-color: rgba(139,26,26,0.3); color: #a32020; }
 .viaje-card:active { transform: scale(0.99); }
 .viaje-top { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.viaje-estado-chip { font-size: 9px; font-weight: 700; font-family: 'Outfit', sans-serif; padding: 3px 8px; border-radius: 20px; white-space: nowrap; }
+.vest-pendiente { background: rgba(201,162,39,0.12); color: #c9a227; }
+.vest-aceptada { background: rgba(37,211,102,0.1); color: #25d366; }
+.vest-en_curso { background: rgba(139,26,26,0.14); color: #a32020; animation: pulse-chip 1.5s ease infinite; }
+.vest-finalizada { background: rgba(100,100,100,0.15); color: rgba(237,233,230,0.4); }
+@keyframes pulse-chip { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
+.viaje-avatar-multi { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
 .viaje-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 800; color: #ede9e6; flex-shrink: 0; }
 .viaje-info { flex: 1; min-width: 0; }
 .viaje-name { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; color: #ede9e6; margin-bottom: 2px; }
@@ -512,4 +583,15 @@ function showToast(msg: string, type: 'success'|'error' = 'success') {
 .nav-item.active { color: #a32020; }
 .nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #a32020; margin-top: -2px; }
 .nav-badge { position: absolute; top: 2px; right: 14px; background: #a32020; color: #ede9e6; border-radius: 10px; font-size: 8px; font-weight: 700; padding: 1px 5px; min-width: 14px; text-align: center; }
+
+.precio-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
+.precio-modal { background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px 20px 0 0; padding: 28px 24px 40px; width: 100%; max-width: 480px; }
+.pm-title { font-family: 'Outfit',sans-serif; font-size: 18px; font-weight: 800; color: #ede9e6; margin-bottom: 4px; }
+.pm-sub { font-size: 12px; color: rgba(237,233,230,0.35); margin-bottom: 20px; }
+.pm-input-wrap { display: flex; align-items: center; background: #0d0d0d; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; }
+.pm-symbol { font-size: 18px; font-weight: 700; color: #25d366; margin-right: 8px; }
+.pm-input { background: transparent; border: none; outline: none; font-size: 22px; font-weight: 700; color: #ede9e6; font-family: 'Outfit',sans-serif; width: 100%; }
+.pm-btns { display: flex; gap: 10px; }
+.pm-btn-skip { flex: 1; padding: 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; color: rgba(237,233,230,0.4); font-family: 'Outfit',sans-serif; font-size: 13px; cursor: pointer; }
+.pm-btn-ok { flex: 2; padding: 13px; background: #8B1A1A; border: none; border-radius: 12px; color: #ede9e6; font-family: 'Outfit',sans-serif; font-size: 14px; font-weight: 800; cursor: pointer; }
 </style>

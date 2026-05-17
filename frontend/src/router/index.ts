@@ -15,6 +15,7 @@ const routes: Array<RouteRecordRaw> = [
   { path: '/perfil/:role/:id', component: () => import('@/views/PerfilView.vue') },
   { path: '/viaje/:id', component: () => import('@/views/ViajeView.vue') },
   { path: '/editar-perfil', component: () => import('@/views/EditarPerfilView.vue') },
+  { path: '/resenas/:userId', component: () => import('@/views/ResenasView.vue') },
 ];
 
 const router = createRouter({

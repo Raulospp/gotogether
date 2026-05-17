@@ -1,14 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const viajeController = require('../controllers/viajeController');
-const authMiddleware = require('../middleware/auth');
+const c = require('../controllers/viajeController');
+const auth = require('../middleware/auth');
 
-// Rutas para viajes
-router.patch('/:id/iniciar', authMiddleware, viajeController.iniciarViaje);
-router.patch('/:id/finalizar', authMiddleware, viajeController.finalizarViaje);
-router.get('/mis-viajes', authMiddleware, viajeController.getMisViajes);
-router.get('/:id', authMiddleware, viajeController.getViajeById);
-router.patch('/:id/ubicacion', authMiddleware, viajeController.updateUbicacion);
-router.delete('/limpiar-pasados', authMiddleware, viajeController.limpiarViajesPasados);
+router.get('/mis-viajes',             auth, c.getMisViajes);
+router.delete('/limpiar-pasados',     auth, c.limpiarViajesPasados);
+router.get('/conductor/:conductorId', auth, c.getPickupsConductor);
+router.get('/:id',                    auth, c.getViajeById);
+router.patch('/:id/iniciar',          auth, c.iniciarViaje);
+router.patch('/:id/finalizar',        auth, c.finalizarViaje);
+router.patch('/:id/calificar',        auth, c.calificarViaje);
+router.patch('/:id/ubicacion',        auth, c.updateUbicacion);
 
 module.exports = router;
