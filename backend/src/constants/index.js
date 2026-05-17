@@ -6,10 +6,22 @@ export const ROLES = Object.freeze({
 
 // ─── Estados de solicitud/viaje ───────────────────────────────────────────────
 export const ESTADOS = Object.freeze({
-  PENDIENTE: 'pendiente',
-  ACEPTADA:  'aceptada',
-  EN_CURSO:  'en_curso',
-  RECHAZADA: 'rechazada',
+  PENDIENTE:  'pendiente',
+  ACEPTADA:   'aceptada',
+  EN_CURSO:   'en_curso',
+  RECHAZADA:  'rechazada',
+  FINALIZADO: 'finalizado',
+});
+
+// ─── Días de la semana ────────────────────────────────────────────────────────
+export const DIA_SEMANA = Object.freeze({
+  DOMINGO:   0,
+  LUNES:     1,
+  MARTES:    2,
+  MIERCOLES: 3,
+  JUEVES:    4,
+  VIERNES:   5,
+  SABADO:    6,
 });
 
 // ─── Configuración de tokens ──────────────────────────────────────────────────
@@ -33,7 +45,7 @@ export const LIMITS = Object.freeze({
   GEO_RADIUS_KM:     1.5,
   GEO_ZOOM_STREET:  '17',
   MIN_WORD_LENGTH:   3,
-  PAGE_SIZE:        20,      // paginación por defecto
+  PAGE_SIZE:        20,
 });
 
 // ─── URLs de servicios externos ───────────────────────────────────────────────
@@ -77,4 +89,6 @@ export const MSG = Object.freeze({
   NO_FIELDS:          'No hay campos para actualizar',
   ONLY_CONDUCTORES:   'Solo conductores pueden realizar esta acción',
   ONLY_PASAJEROS:     'Solo pasajeros pueden realizar esta acción',
+  SIN_CUPOS:          'El conductor no tiene cupos disponibles',
+  FRANJA_SOLAPADA:    'Las franjas horarias se solapan',
 });

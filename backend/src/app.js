@@ -13,6 +13,7 @@ import usersRouter      from './routes/users.route.js';
 import solicitudesRouter from './routes/solicitudes.route.js';
 import viajesRouter     from './routes/viajes.route.js';
 import horariosRouter   from './routes/horarios.route.js';
+import franjasRouter    from './routes/franjas.route.js';
 import mapsRouter       from './routes/maps.route.js';
 import pricingRouter    from './routes/price.route.js';
 
@@ -33,6 +34,7 @@ app.use('/api/users',       usersRouter);
 app.use('/api/solicitudes', solicitudesRouter);
 app.use('/api/viajes',      viajesRouter);
 app.use('/api/horarios',    horariosRouter);
+app.use('/api/franjas',     franjasRouter);   // ◄ nuevo: franjas horarias por destino
 app.use('/api/maps',        mapsRouter);
 app.use('/api/pricing',     pricingRouter);
 

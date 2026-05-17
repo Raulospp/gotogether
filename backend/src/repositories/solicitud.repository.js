@@ -14,11 +14,36 @@ export const SolicitudRepository = {
     return rows.length > 0;
   },
 
+  /** Creación simple sin coords (conductor invita) */
   create: async (pasajeroId, conductorId, iniciadoPor) => {
     const { rows } = await pool.query(
       `INSERT INTO solicitudes (pasajero_id, conductor_id, iniciado_por, fecha_viaje)
        VALUES ($1,$2,$3,CURRENT_DATE) RETURNING *`,
       [pasajeroId, conductorId, iniciadoPor],
+    );
+    return rows[0];
+  },
+
+  /** Creación con pickup + destino en un solo paso (pasajero solicita) */
+  createConPickup: async (pasajeroId, conductorId, iniciadoPor, pickupData) => {
+    const {
+      pickup_lat, pickup_lon, pickup_name,
+      pickup_direccion, pickup_universidad,
+      destino_lat, destino_lon,
+    } = pickupData;
+
+    const { rows } = await pool.query(
+      `INSERT INTO solicitudes
+         (pasajero_id, conductor_id, iniciado_por, fecha_viaje,
+          pickup_lat, pickup_lon, pickup_name,
+          pickup_direccion, pickup_universidad,
+          destino_lat, destino_lon)
+       VALUES ($1,$2,$3,CURRENT_DATE,$4,$5,$6,$7,$8,$9,$10)
+       RETURNING *`,
+      [pasajeroId, conductorId, iniciadoPor,
+       pickup_lat, pickup_lon, pickup_name,
+       pickup_direccion, pickup_universidad,
+       destino_lat, destino_lon],
     );
     return rows[0];
   },
@@ -48,6 +73,9 @@ export const SolicitudRepository = {
       SELECT
         s.id, s.estado, s.created_at, s.iniciado_por,
         s.pasajero_id, s.conductor_id,
+        s.pickup_lat, s.pickup_lon, s.pickup_name,
+        s.pickup_direccion, s.pickup_universidad,
+        s.destino_lat, s.destino_lon,
         p.name AS pasajero_name, p.city AS pasajero_city,
         p.university AS pasajero_university, p.phone AS pasajero_phone,
         c.name AS conductor_name, c.city AS conductor_city,
@@ -92,7 +120,6 @@ export const SolicitudRepository = {
     return rows[0] ?? null;
   },
 
-  // ── Para maps.controller: pickup de un pasajero en viaje aceptado ─────────
   findPickupBySolicitudAndConductor: async (solicitudId, conductorId) => {
     const { rows } = await pool.query(`
       SELECT s.pickup_lat, s.pickup_lon, s.pickup_name,
@@ -104,7 +131,6 @@ export const SolicitudRepository = {
     return rows[0] ?? null;
   },
 
-  // ── Para price.controller: solicitud con config de precio del conductor ───
   findSolicitudConPrecio: async (solicitudId, pasajeroId) => {
     const { rows } = await pool.query(`
       SELECT
@@ -116,6 +142,36 @@ export const SolicitudRepository = {
       LEFT JOIN horarios h ON h.user_id = s.conductor_id
       WHERE s.id=$1 AND s.pasajero_id=$2
     `, [solicitudId, pasajeroId]);
+    return rows[0] ?? null;
+  },
+
+  // ── Para ruta consolidada: todos los pasajeros activos del conductor hoy ──
+  findPasajerosActivosConductor: async (conductorId) => {
+    const { rows } = await pool.query(`
+      SELECT
+        s.id AS solicitud_id,
+        s.estado,
+        s.pickup_lat, s.pickup_lon, s.pickup_name,
+        s.pickup_direccion, s.pickup_universidad,
+        s.destino_lat, s.destino_lon,
+        p.id AS pasajero_id, p.name AS pasajero_name, p.phone AS pasajero_phone
+      FROM solicitudes s
+      JOIN users p ON p.id = s.pasajero_id
+      WHERE s.conductor_id = $1
+        AND s.estado IN ('aceptada','en_curso')
+        AND s.fecha_viaje = CURRENT_DATE
+      ORDER BY s.created_at ASC
+    `, [conductorId]);
+    return rows;
+  },
+
+  // ── Eliminar pasajero de la ruta (al llegar a su destino) ─────────────────
+  marcarPasajeroEntregado: async (solicitudId, conductorId) => {
+    const { rows } = await pool.query(`
+      DELETE FROM solicitudes
+      WHERE id=$1 AND conductor_id=$2 AND estado='en_curso'
+      RETURNING id, pasajero_id
+    `, [solicitudId, conductorId]);
     return rows[0] ?? null;
   },
 };

@@ -26,3 +26,18 @@ export const getViajeById = asyncHandler(async (req, res) => {
   const viaje = await ViajeService.getById(req.params.id, req.user.id, req.user.role);
   ok(res, viaje, 'Viaje obtenido');
 });
+
+/** GET /api/viajes/ruta-consolidada — solo conductor */
+export const getRutaConsolidada = asyncHandler(async (req, res) => {
+  const resultado = await ViajeService.getRutaConsolidada(req.user.id);
+  ok(res, resultado, 'Ruta consolidada obtenida');
+});
+
+/**
+ * DELETE /api/viajes/:id/entregar — conductor marca pasajero como entregado.
+ * Elimina al pasajero de la ruta activa del conductor.
+ */
+export const entregarPasajero = asyncHandler(async (req, res) => {
+  const resultado = await ViajeService.entregarPasajero(req.params.id, req.user.id);
+  ok(res, resultado, 'Pasajero entregado y eliminado de la ruta');
+});

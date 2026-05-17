@@ -68,6 +68,7 @@ async function createTableSolicitudes() {
 }
 
 async function createTableHorarios() {
+  // horarios: un registro por conductor, schedule y routes son JSONB legacy
   await pool.query(`
     CREATE TABLE IF NOT EXISTS horarios (
       id         SERIAL PRIMARY KEY,
@@ -77,6 +78,36 @@ async function createTableHorarios() {
       precio     JSONB        DEFAULT '{}',
       updated_at TIMESTAMPTZ  DEFAULT NOW()
     );
+  `);
+}
+
+/**
+ * Nueva tabla: franjas horarias por destino del conductor.
+ * Cada fila = un bloque de tiempo con un destino específico.
+ * Constraint: no se pueden solapar franjas del mismo conductor el mismo día.
+ */
+async function createTableFranjasHorarias() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS franjas_horarias (
+      id             SERIAL PRIMARY KEY,
+      conductor_id   INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+      dia_semana     SMALLINT,        -- 0=Dom,1=Lun,...,6=Sab  NULL = cualquier día
+      fecha_especifica DATE,          -- fecha exacta (sobreescribe dia_semana si se indica)
+      hora_inicio    TIME NOT NULL,
+      hora_fin       TIME NOT NULL,
+      destino_nombre VARCHAR(200) NOT NULL,
+      destino_lat    DOUBLE PRECISION,
+      destino_lon    DOUBLE PRECISION,
+      activa         BOOLEAN DEFAULT TRUE,
+      created_at     TIMESTAMPTZ DEFAULT NOW(),
+      CONSTRAINT franja_hora_valida CHECK (hora_fin > hora_inicio)
+    );
+  `);
+
+  // Índice para consultar franjas activas de un conductor
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_franjas_conductor
+      ON franjas_horarias(conductor_id, activa);
   `);
 }
 
@@ -109,6 +140,7 @@ export async function initDB() {
   await createTableUsers();
   await createTableSolicitudes();
   await createTableHorarios();
+  await createTableFranjasHorarias();
   await createTableRefreshTokens();
   await createIndexes();
   logger.info('Base de datos inicializada');

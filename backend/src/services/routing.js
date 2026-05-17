@@ -49,4 +49,4 @@ export async function reverseGeocode(lat, lon) {
   } catch {
     return '';
   }
-}
+};

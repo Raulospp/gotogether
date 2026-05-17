@@ -1,8 +1,9 @@
 import { HorarioRepository }   from '../repositories/horario.repository.js';
 import { SolicitudRepository } from '../repositories/solicitud.repository.js';
-import { getCoordinates, getRouteWithPassengers, getSuggestedDrivers } from '../services/maps.service.js';
-import { snapToRoad, reverseGeocode }            from '../utils/routing.js';
-import { isPassengerOnRoute, findPickupPoint }   from '../utils/geo.js';
+import { getCoordinates, getRouteWithPassengers } from '../services/maps.service.js';
+import { FranjaService }                          from '../services/franja.service.js';
+import { snapToRoad, reverseGeocode }             from '../utils/routing.js';
+import { isPassengerOnRoute, findPickupPoint }    from '../utils/geo.js';
 import { asyncHandler }  from '../utils/async-handler.js';
 import { ok, fail }      from '../utils/response.js';
 import { AppError }      from '../utils/AppError.js';
@@ -50,6 +51,12 @@ export const getRoute = asyncHandler(async (req, res) => {
   ok(res, { polyline, distanceKm, durationMin, legs }, 'Ruta obtenida');
 });
 
+/**
+ * GET /api/maps/conductores-sugeridos?destination=...&radius=...
+ *
+ * Solo pasajeros. Busca conductores con franja horaria activa HOY cuyo
+ * destino coincide con el del pasajero. Devuelve cupos, franja y precio.
+ */
 export const getSuggestedDriversHandler = asyncHandler(async (req, res) => {
   if (req.user.role !== ROLES.PASAJERO)
     throw AppError.forbidden('Solo pasajeros pueden buscar conductores', 'FORBIDDEN_ROLE');
@@ -58,10 +65,15 @@ export const getSuggestedDriversHandler = asyncHandler(async (req, res) => {
   if (!destination)
     return fail(res, HTTP.BAD_REQUEST, 'destination es requerido', 'MISSING_PARAM');
 
-  const radiusKm = parseFloat(radius) || LIMITS.GEO_RADIUS_KM;
-  const drivers  = await getSuggestedDrivers(destination, radiusKm);
+  const radiusKm  = parseFloat(radius) || LIMITS.GEO_RADIUS_KM;
+  const conductores = await FranjaService.sugerirConductores(destination, radiusKm);
 
-  ok(res, { query: destination, total: drivers.length, drivers }, 'Conductores sugeridos');
+  ok(res, {
+    query:  destination,
+    total:  conductores.length,
+    drivers: conductores,   // alias legacy mantenido
+    conductores,
+  }, 'Conductores sugeridos');
 });
 
 export const validatePickup = asyncHandler(async (req, res) => {

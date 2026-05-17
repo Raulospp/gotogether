@@ -88,4 +88,4 @@ export function findPickupPoint(point, polyline) {
   }
 
   return best;
-}
+};

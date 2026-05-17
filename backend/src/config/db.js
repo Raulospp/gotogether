@@ -18,3 +18,4 @@ pool.on('error', (err) => {
   logger.error('Error inesperado en el pool de Postgres', { message: err.message });
 });
 
+
