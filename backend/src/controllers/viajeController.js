@@ -5,7 +5,7 @@ exports.iniciarViaje = async (req, res, next) => {
     const userId = req.user.id;
     const result = await pool.query(
       `UPDATE solicitudes SET estado = 'en_curso'
-       WHERE conductor_id = $1::integer AND estado = 'aceptada' AND fecha_viaje = CURRENT_DATE
+       WHERE conductor_id = $1::integer AND estado = 'aceptada'
        RETURNING id`,
       [userId]
     );
@@ -17,13 +17,14 @@ exports.iniciarViaje = async (req, res, next) => {
 exports.finalizarViaje = async (req, res, next) => {
   try {
     const userId = req.user.id;
+    // Finalizar todas las solicitudes en_curso o aceptadas del conductor (sin filtro de fecha)
     const result = await pool.query(
       `UPDATE solicitudes SET estado = 'finalizada'
-       WHERE conductor_id = $1::integer AND estado = 'en_curso' AND fecha_viaje = CURRENT_DATE
+       WHERE conductor_id = $1::integer AND estado IN ('en_curso','aceptada')
        RETURNING id`,
       [userId]
     );
-    if (result.rowCount === 0) return res.status(404).json({ message: 'No hay viajes en curso' });
+    if (result.rowCount === 0) return res.status(404).json({ message: 'No hay viajes para finalizar' });
     res.json({ message: 'Viaje finalizado', actualizadas: result.rowCount });
   } catch (err) { next(err); }
 };
@@ -63,7 +64,8 @@ exports.calificarViaje = async (req, res, next) => {
 // Helper para construir objeto agrupado del conductor
 async function getViajesConductor(conductorId) {
   const result = await pool.query(`
-    SELECT s.id as solicitud_id, s.estado, s.fecha_viaje,
+    SELECT DISTINCT ON (p.id)
+           s.id as solicitud_id, s.estado, s.fecha_viaje,
            p.id as pasajero_id, p.name as pasajero_name,
            p.city as pasajero_city, p.university as pasajero_university,
            p.phone as pasajero_phone,
@@ -76,9 +78,8 @@ async function getViajesConductor(conductorId) {
     JOIN users p ON p.id = s.pasajero_id
     LEFT JOIN horarios h ON h.user_id = s.conductor_id
     WHERE s.conductor_id = $1::integer
-      AND s.estado IN ('aceptada','en_curso','finalizada')
-      AND s.fecha_viaje >= CURRENT_DATE - INTERVAL '1 day'
-    ORDER BY s.created_at ASC
+      AND s.estado IN ('aceptada','en_curso')
+    ORDER BY p.id, s.created_at DESC
   `, [conductorId]);
   if (result.rows.length === 0) return null;
   const base = result.rows[0];
