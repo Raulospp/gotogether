@@ -140,84 +140,69 @@
           Sin viajes confirmados hoy
         </div>
 
-        <div v-else v-for="v in viajesHoy" :key="v.viaje_id || v.solicitud_id" class="viaje-card" @click="router.push(`/viaje/${v.viaje_id || v.solicitud_id}`)">
-          <!-- Header del viaje -->
+        <!-- CONDUCTOR: una card por pasajero -->
+        <template v-if="isConductor">
+          <template v-for="v in viajesHoy" :key="v.solicitud_id">
+            <div v-for="p in (v.pasajeros?.length ? v.pasajeros : [v])" :key="p.solicitud_id"
+              class="viaje-card" @click="viajeAbierto === p.solicitud_id ? viajeAbierto = null : viajeAbierto = p.solicitud_id">
+              <div class="viaje-top">
+                <div class="viaje-avatar" :style="`background:${avatarColor(p.pasajero_name || 'P')}`">
+                  {{ initial(p.pasajero_name || 'P') }}
+                </div>
+                <div class="viaje-info">
+                  <div class="viaje-name">{{ p.pasajero_name || 'Pasajero' }}</div>
+                  <div class="viaje-sub">{{ p.pickup_universidad || p.pasajero_university || 'Sin universidad' }}</div>
+                </div>
+                <div class="viaje-right">
+                  <div v-if="p.precio_viaje" class="viaje-precio">${{ Number(p.precio_viaje).toLocaleString('es-CO') }}</div>
+                  <div class="viaje-estado-chip" :class="`vest-${p.estado || v.estado}`">{{ estadoViajeLabel(p.estado || v.estado) }}</div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="viajeAbierto === p.solicitud_id ? 'transform:rotate(180deg)' : ''"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </div>
+
+          <!-- Detalle expandible -->
+              <div v-if="viajeAbierto === p.solicitud_id" class="viaje-detail">
+                <div class="viaje-divider"></div>
+                <div class="pasajero-detail-row">
+                  <div v-if="p.pickup_direccion" class="pdr-item">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    {{ p.pickup_direccion }}
+                  </div>
+                  <div v-if="p.pasajero_phone" class="pdr-item">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12 19.79 19.79 0 0 1 1.08 3.37 2 2 0 0 1 3.05 1.17h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16z"/></svg>
+                    {{ p.pasajero_phone }}
+                  </div>
+                  <div v-if="p.precio_viaje" class="pdr-precio">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    ${{ Number(p.precio_viaje).toLocaleString('es-CO') }}
+                  </div>
+                </div>
+                <button v-if="p.pasajero_phone" class="btn-wpp-viaje"
+                  @click.stop="wppViaje(p.pasajero_phone)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.853L0 24l6.335-1.521A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.645-.52-5.148-1.422l-.369-.218-3.763.904.937-3.666-.242-.381A9.96 9.96 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+              Contactar por WhatsApp
+                </button>
+              </div><!-- fin detalle expandible -->
+            </div><!-- fin card pasajero -->
+          </template><!-- fin loop pasajeros -->
+        </template><!-- fin template conductor -->
+
+        <!-- PASAJERO: card normal -->
+        <div v-if="!isConductor" v-for="v in viajesHoy" :key="v.solicitud_id" class="viaje-card"
+          @click="router.push(`/viaje/${v.solicitud_id}`)">
           <div class="viaje-top">
-            <div v-if="isConductor" class="viaje-avatar" :style="`background:${avatarColor(v.pasajero_name || 'P')}`">
-              {{ initial(v.pasajero_name || 'P') }}
-            </div>
-            <div v-else class="viaje-avatar" :style="`background:${avatarColor(v.conductor_name)}`">
+            <div class="viaje-avatar" :style="`background:${avatarColor(v.conductor_name)}`">
               {{ initial(v.conductor_name) }}
             </div>
             <div class="viaje-info">
-              <div class="viaje-name">
-                {{ isConductor ? (v.pasajero_name || 'Pasajero') : v.conductor_name }}
-              </div>
-              <div class="viaje-sub">
-                {{ isConductor
-                  ? (v.pickup_universidad || v.pasajero_university || 'Sin universidad')
-                  : `${v.car_model} · ${v.conductor_city}` }}
-              </div>
+              <div class="viaje-name">{{ v.conductor_name }}</div>
+              <div class="viaje-sub">{{ v.car_model }} · {{ v.conductor_city }}</div>
             </div>
             <div class="viaje-right">
-              <div v-if="getPrecioHoy(v)" class="viaje-precio">${{ getPrecioHoy(v) }}</div>
               <div class="viaje-estado-chip" :class="`vest-${v.estado}`">{{ estadoViajeLabel(v.estado) }}</div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="viajeAbierto === (v.viaje_id || v.solicitud_id) ? 'transform:rotate(180deg)' : ''"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
           </div>
-
-          <!-- Detalle expandible -->
-          <div v-if="viajeAbierto === (v.viaje_id || v.solicitud_id)" class="viaje-detail">
-            <div class="viaje-divider"></div>
-
-            <!-- Horario del día -->
-            <div class="viaje-horario">
-              <div class="viaje-slot" v-if="getHorarioViaje(v, 'ida')">
-                <span class="slot-dir">↑ Salida</span>
-                <span class="slot-time">{{ getHorarioViaje(v, 'ida') }}</span>
-              </div>
-              <div class="viaje-slot" v-if="getHorarioViaje(v, 'vuelta')">
-                <span class="slot-dir">↓ Regreso</span>
-                <span class="slot-time">{{ getHorarioViaje(v, 'vuelta') }}</span>
-              </div>
-            </div>
-
-            <!-- Ruta -->
-            <div v-if="getRutaViaje(v).length > 0" class="viaje-ruta">
-              <div v-for="(stop, i) in getRutaViaje(v)" :key="i" class="viaje-stop">
-                <div class="vstop-dot" :class="i === 0 ? 'start' : i === getRutaViaje(v).length-1 ? 'end' : 'mid'"></div>
-                <span class="vstop-label">{{ stop }}</span>
-              </div>
-            </div>
-
-            <!-- Precio -->
-            <div v-if="getPrecioHoy(v)" class="viaje-precio-row">
-              <span>Valor del viaje</span>
-              <span class="precio-val">${{ Number(getPrecioHoy(v)).toLocaleString('es-CO') }}</span>
-            </div>
-
-            <!-- WhatsApp -->
-            <!-- Info pasajero para conductor -->
-            <div v-if="isConductor" class="pasajero-detail-row">
-              <div v-if="v.pickup_direccion" class="pdr-item">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                {{ v.pickup_direccion }}
-              </div>
-              <div v-if="v.pasajero_phone" class="pdr-item">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12 19.79 19.79 0 0 1 1.08 3.37 2 2 0 0 1 3.05 1.17h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16z"/></svg>
-                {{ v.pasajero_phone }}
-              </div>
-              <div v-if="getPrecioHoy(v)" class="pdr-precio">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                ${{ Number(getPrecioHoy(v)).toLocaleString('es-CO') }}
-              </div>
-            </div>
-            <button v-if="(isConductor ? v.pasajero_phone : v.conductor_phone)" class="btn-wpp-viaje"
-              @click.stop="wppViaje(isConductor ? v.pasajero_phone : v.conductor_phone)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.853L0 24l6.335-1.521A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.645-.52-5.148-1.422l-.369-.218-3.763.904.937-3.666-.242-.381A9.96 9.96 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-              Contactar por WhatsApp
-            </button>
-          </div>
+        </div>
         </div>
 
         <div style="height:20px"></div>
