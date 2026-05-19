@@ -3,10 +3,20 @@ const { pool } = require('../config');
 exports.iniciarViaje = async (req, res, next) => {
   try {
     const userId = req.user.id;
+    const solicitudId = req.params.id;
+    if (solicitudId && solicitudId !== 'undefined') {
+      const result = await pool.query(
+        `UPDATE solicitudes SET estado = 'en_curso'
+         WHERE id = $1::integer AND conductor_id = $2::integer AND estado = 'aceptada'
+         RETURNING id`,
+        [solicitudId, userId]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ message: 'Solicitud no encontrada' });
+      return res.json({ message: 'Viaje iniciado' });
+    }
     const result = await pool.query(
       `UPDATE solicitudes SET estado = 'en_curso'
-       WHERE conductor_id = $1::integer AND estado = 'aceptada'
-       RETURNING id`,
+       WHERE conductor_id = $1::integer AND estado = 'aceptada' RETURNING id`,
       [userId]
     );
     if (result.rowCount === 0) return res.status(404).json({ message: 'No hay solicitudes aceptadas' });
@@ -17,11 +27,20 @@ exports.iniciarViaje = async (req, res, next) => {
 exports.finalizarViaje = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    // Finalizar todas las solicitudes en_curso o aceptadas del conductor (sin filtro de fecha)
+    const solicitudId = req.params.id;
+    if (solicitudId && solicitudId !== 'undefined') {
+      const result = await pool.query(
+        `UPDATE solicitudes SET estado = 'finalizada'
+         WHERE id = $1::integer AND conductor_id = $2::integer AND estado IN ('en_curso','aceptada')
+         RETURNING id`,
+        [solicitudId, userId]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ message: 'Solicitud no encontrada' });
+      return res.json({ message: 'Viaje finalizado' });
+    }
     const result = await pool.query(
       `UPDATE solicitudes SET estado = 'finalizada'
-       WHERE conductor_id = $1::integer AND estado IN ('en_curso','aceptada')
-       RETURNING id`,
+       WHERE conductor_id = $1::integer AND estado IN ('en_curso','aceptada') RETURNING id`,
       [userId]
     );
     if (result.rowCount === 0) return res.status(404).json({ message: 'No hay viajes para finalizar' });
