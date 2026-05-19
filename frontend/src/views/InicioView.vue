@@ -197,10 +197,20 @@
             </div>
 
             <!-- WhatsApp -->
-            <!-- Pickup del pasajero (conductor) -->
-            <div v-if="isConductor && v.pickup_direccion" class="viaje-pickup-row">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              {{ v.pickup_direccion }}
+            <!-- Info pasajero para conductor -->
+            <div v-if="isConductor" class="pasajero-detail-row">
+              <div v-if="v.pickup_direccion" class="pdr-item">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                {{ v.pickup_direccion }}
+              </div>
+              <div v-if="v.pasajero_phone" class="pdr-item">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12 19.79 19.79 0 0 1 1.08 3.37 2 2 0 0 1 3.05 1.17h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16z"/></svg>
+                {{ v.pasajero_phone }}
+              </div>
+              <div v-if="getPrecioHoy(v)" class="pdr-precio">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                ${{ Number(getPrecioHoy(v)).toLocaleString('es-CO') }}
+              </div>
             </div>
             <button v-if="(isConductor ? v.pasajero_phone : v.conductor_phone)" class="btn-wpp-viaje"
               @click.stop="wppViaje(isConductor ? v.pasajero_phone : v.conductor_phone)">
@@ -341,7 +351,6 @@ async function fetchViajes() {
         routes:   typeof v.routes   === 'string' ? JSON.parse(v.routes)   : (v.routes   || {}),
         pasajeros: (v.pasajeros || []),
       }));
-      console.log('[fetchViajes] resultado:', JSON.stringify(viajes.value));
     }
   } catch(e) { console.error(e); }
   finally { loadingViajes.value = false; }
@@ -359,6 +368,9 @@ function getRutaViaje(v: any, dia?: string) {
   return (v.routes?.[d]?.stops || []).filter(Boolean);
 }
 function getPrecioHoy(v: any, dia?: string) {
+  // precio_viaje tiene prioridad (lo que ingreso el conductor al aceptar)
+  if (v.precio_viaje) return String(v.precio_viaje);
+  // Fallback: precio del horario del conductor para el dia
   const d = dia || diaHoy;
   return v.precio?.[d] || '';
 }
@@ -446,7 +458,10 @@ async function responder(id: number, estado: string, precio?: string) {
     });
     if (res.ok) {
       showToast(estado === 'aceptada' ? '¡Solicitud aceptada!' : 'Solicitud rechazada', estado === 'aceptada' ? 'success' : 'error');
-      await fetchSolicitudes();
+      // Quitar la solicitud de la lista inmediatamente sin esperar al servidor
+      solicitudes.value = solicitudes.value.filter((s: any) => s.id !== id);
+      fetchPendientesCount();
+      if (estado === 'aceptada') await fetchViajes();
     }
   } catch { showToast('Error', 'error'); }
 }
@@ -571,7 +586,9 @@ function showToast(msg: string, type: 'success'|'error' = 'success') {
 .vstop-label { font-size: 12px; color: rgba(237,233,230,0.65); }
 .viaje-precio-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4px; font-size: 12px; color: rgba(237,233,230,0.4); }
 .precio-val { font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: #25d366; }
-.viaje-pickup-row { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: rgba(237,233,230,0.5); padding: 4px 0 8px; font-family: 'DM Sans', sans-serif; }
+.pasajero-detail-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
+.pdr-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: rgba(237,233,230,0.45); font-family: 'DM Sans', sans-serif; }
+.pdr-precio { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: #25d366; font-family: 'Outfit', sans-serif; }
 .btn-wpp-viaje { width: 100%; margin-top: 10px; padding: 10px; background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.22); border-radius: 10px; color: #25d366; font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
