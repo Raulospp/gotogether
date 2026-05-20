@@ -181,6 +181,22 @@
           <ion-icon :icon="starOutline" class="empty-icon" />
           <p>Aún no tienes reseñas</p>
         </div>
+        <div v-else>
+          <div v-for="r in reviews" :key="r.id" class="resena-card">
+            <div class="resena-top">
+              <div class="resena-av">{{ r.autor_name?.charAt(0).toUpperCase() }}</div>
+              <div class="resena-meta">
+                <div class="resena-name">{{ r.autor_name }}</div>
+                <div class="resena-role">{{ r.autor_role === 'conductor' ? '🚗 Conductor' : '🎓 Pasajero' }}</div>
+              </div>
+              <div class="resena-stars">
+                <span v-for="i in 5" :key="i" :style="i <= r.calificacion ? 'color:#c9a227' : 'color:rgba(255,255,255,0.1)'">★</span>
+              </div>
+            </div>
+            <p v-if="r.comentario" class="resena-comentario">{{ r.comentario }}</p>
+            <div class="resena-fecha">{{ new Date(r.created_at).toLocaleDateString('es-CO', {day:'numeric',month:'short',year:'numeric'}) }}</div>
+          </div>
+        </div>
       </div>
 
 
@@ -330,7 +346,10 @@ async function loadHorarioDB() {
   } catch (e) { console.error('Error cargando horario:', e); }
 }
 
-onMounted(loadHorarioDB);
+onMounted(() => {
+  loadHorarioDB();
+  fetchResenas();
+});
 
 const savedDia = ref('');
 async function autoSave(diaKey: string) {
@@ -364,7 +383,19 @@ function toggleDia(tab: string, key: string) {
   (openDias as any)[tab][key] = !(openDias as any)[tab][key];
 }
 
-const reviews = ref<{name: string; rating: number; comment: string}[]>([]);
+const reviews = ref<any[]>([]);
+async function fetchResenas() {
+  try {
+    const authStore = useAuthStore();
+    const userId = authStore.user?.id;
+    if (!userId) return;
+    const token = localStorage.getItem('token') || '';
+    const res = await fetch(`https://gotogether-api.onrender.com/api/resenas/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) reviews.value = await res.json();
+  } catch(e) { console.error(e); }
+}
 const avgRating = computed(() => {
   if (!reviews.value.length) return null;
   return (reviews.value.reduce((a, r) => a + r.rating, 0) / reviews.value.length).toFixed(1);
@@ -521,6 +552,13 @@ function handleLogout() { authStore.logout(); router.replace('/welcome'); }
 .nav-item ion-icon { font-size: 20px; }
 .nav-item.active { color: #a32020; }
 .nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #a32020; margin-top: -2px; }
+.resena-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+.resena-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.resena-av { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg,#8B1A1A,#4a0e0e); display: flex; align-items: center; justify-content: center; font-weight: 800; color: #ede9e6; font-size: 14px; flex-shrink: 0; }
+.resena-meta { flex: 1; }
+.resena-name { font-weight: 700; font-size: 13px; color: #ede9e6; }
+.resena-role { font-size: 10px; color: rgba(237,233,230,0.35); margin-top: 1px; }
+.resena-stars { font-size: 14px; letter-spacing: 1px; }
+.resena-comentario { font-size: 13px; color: rgba(237,233,230,0.6); line-height: 1.5; margin: 0 0 6px; }
+.resena-fecha { font-size: 10px; color: rgba(237,233,230,0.2); }
 </style>
-
-
