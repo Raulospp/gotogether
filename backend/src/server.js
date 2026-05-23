@@ -3,13 +3,14 @@ const cors = require('cors');
 const config = require('./config');
 const errorHandler = require('./middleware/errorHandler');
 
-const authRoutes      = require('./routes/auth');
-const userRoutes      = require('./routes/users');
-const solicitudRoutes = require('./routes/solicitudes');
-const viajeRoutes     = require('./routes/viajes');
-const horarioRoutes   = require('./routes/horarios');
-const geocodeRoutes   = require('./routes/geocode');
-const resenasRoutes   = require('./routes/resenas');
+const authRoutes          = require('./routes/auth');
+const userRoutes          = require('./routes/users');
+const solicitudRoutes     = require('./routes/solicitudes');
+const viajeRoutes         = require('./routes/viajes');
+const horarioRoutes       = require('./routes/horarios');
+const geocodeRoutes       = require('./routes/geocode');
+const resenasRoutes       = require('./routes/resenas');
+const notificacionRoutes  = require('./routes/notificaciones'); // ← NUEVO
 
 const app = express();
 
@@ -22,13 +23,14 @@ app.use((req, res, next) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-app.use('/api/auth',        authRoutes);
-app.use('/api/users',       userRoutes);
-app.use('/api/solicitudes', solicitudRoutes);
-app.use('/api/viajes',      viajeRoutes);
-app.use('/api/horarios',    horarioRoutes);
-app.use('/api/geocode',     geocodeRoutes);
-app.use('/api/resenas',     resenasRoutes);
+app.use('/api/auth',            authRoutes);
+app.use('/api/users',           userRoutes);
+app.use('/api/solicitudes',     solicitudRoutes);
+app.use('/api/viajes',          viajeRoutes);
+app.use('/api/horarios',        horarioRoutes);
+app.use('/api/geocode',         geocodeRoutes);
+app.use('/api/resenas',         resenasRoutes);
+app.use('/api/notificaciones',  notificacionRoutes); // ← NUEVO
 
 app.use(errorHandler);
 
@@ -117,6 +119,24 @@ async function initDB() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+
+  // ─── TABLA DE NOTIFICACIONES (NUEVA) ───────────────────────────────────────
+  await config.pool.query(`
+    CREATE TABLE IF NOT EXISTS notificaciones (
+      id           SERIAL PRIMARY KEY,
+      usuario_id   INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+      tipo         VARCHAR(50) NOT NULL,
+      titulo       VARCHAR(150) NOT NULL,
+      mensaje      TEXT NOT NULL,
+      leida        BOOLEAN DEFAULT FALSE,
+      solicitud_id INTEGER REFERENCES solicitudes(id) ON DELETE SET NULL,
+      created_at   TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  await config.pool.query(`CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario ON notificaciones(usuario_id)`);
+  await config.pool.query(`CREATE INDEX IF NOT EXISTS idx_notificaciones_leida   ON notificaciones(usuario_id, leida)`);
+  // ───────────────────────────────────────────────────────────────────────────
+
   await config.pool.query(`CREATE INDEX IF NOT EXISTS idx_resenas_receptor ON resenas(receptor_id)`);
   await config.pool.query(`CREATE INDEX IF NOT EXISTS idx_resenas_autor    ON resenas(autor_id)`);
   await config.pool.query(`CREATE INDEX IF NOT EXISTS idx_users_role            ON users(role)`);

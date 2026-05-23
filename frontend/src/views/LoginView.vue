@@ -51,10 +51,12 @@ import { useRouter, useRoute } from 'vue-router';
 import { IonPage, IonContent, IonIcon } from '@ionic/vue';
 import { arrowBackOutline, mailOutline, lockClosedOutline, arrowForwardOutline } from 'ionicons/icons';
 import { useAuthStore } from '@/stores/authStore';
+import { useNotificacionStore } from '@/stores/notificacionStore';
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
+const notifStore = useNotificacionStore();
 
 const email = ref('');
 const password = ref('');
@@ -74,6 +76,7 @@ async function handleLogin() {
       error.value = `Esta cuenta es de ${userRole === 'conductor' ? 'conductor' : 'pasajero'}. Ingresa por la opción correcta.`;
       return;
     }
+    notifStore.startPolling(30_000);
     router.replace('/inicio');
   } catch (e: any) {
     error.value = e.message || 'Error al iniciar sesión';

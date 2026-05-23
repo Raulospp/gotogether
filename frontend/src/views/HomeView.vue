@@ -214,6 +214,11 @@
           <ion-icon :icon="documentTextOutline" />
           <span>Solicitudes</span>
         </button>
+        <button class="nav-item" @click="router.push('/notificaciones')" style="position:relative">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span>Alertas</span>
+          <div v-if="notifCount > 0" class="nav-badge">{{ notifCount }}</div>
+        </button>
         <button class="nav-item active">
           <ion-icon :icon="personOutline" />
           <span>Perfil</span>
@@ -236,9 +241,12 @@ import {
   homeOutline, searchOutline, documentTextOutline,
 } from 'ionicons/icons';
 import { useAuthStore } from '@/stores/authStore';
+import { useNotificacionStore } from '@/stores/notificacionStore';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const notifStore = useNotificacionStore();
+const notifCount = computed(() => notifStore.noLeidasCount);
 const user = computed(() => authStore.user);
 const isConductor = computed(() => user.value?.role === 'conductor');
 const userInitial = computed(() => user.value?.name?.charAt(0).toUpperCase() || '?');
@@ -551,6 +559,7 @@ function handleLogout() { authStore.logout(); router.replace('/welcome'); }
 }
 .nav-item ion-icon { font-size: 20px; }
 .nav-item.active { color: #a32020; }
+.nav-badge { position: absolute; top: 2px; right: 14px; background: #a32020; color: #ede9e6; border-radius: 10px; font-size: 8px; font-weight: 700; padding: 1px 5px; min-width: 14px; text-align: center; }
 .nav-dot { width: 4px; height: 4px; border-radius: 50%; background: #a32020; margin-top: -2px; }
 .resena-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
 .resena-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }

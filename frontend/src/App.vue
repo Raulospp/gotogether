@@ -5,7 +5,22 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue';
 import { IonApp, IonRouterOutlet } from '@ionic/vue';
+import { useNotificacionStore } from '@/stores/notificacionStore';
+
+const notifStore = useNotificacionStore();
+
+onMounted(() => {
+  // Inicia el polling del badge si el usuario ya tiene sesión activa
+  if (localStorage.getItem('token')) {
+    notifStore.startPolling(30_000); // cada 30 segundos
+  }
+});
+
+onUnmounted(() => {
+  notifStore.stopPolling();
+});
 </script>
 
 <style>
@@ -40,4 +55,3 @@ ion-page {
   padding-top: env(safe-area-inset-top);
 }
 </style>
-EOF
