@@ -13,7 +13,6 @@ exports.geocode = async (req, res, next) => {
     }
     res.json(result);
   } catch (err) {
-    // *****MEJORA: Mostramos el error real en los logs*****
     console.error('[geocode] ERROR INTERNO EN EL CONTROLADOR:', err.message);
     res.status(500).json({ message: 'Error interno del servidor', detalleTecnico: err.message });
   }

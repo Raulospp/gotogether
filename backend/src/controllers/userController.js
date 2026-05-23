@@ -1,4 +1,4 @@
-const pool = require('../../db/db');
+const { pool } = require('../config');
 
 exports.getConductores = async (req, res, next) => {
   try {

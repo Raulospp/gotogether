@@ -1,4 +1,4 @@
-const pool = require('../../db/db');
+const { pool } = require('../config');
 
 exports.guardarHorario = async (req, res, next) => {
   try {

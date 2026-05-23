@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const config = require('./config');
@@ -10,7 +11,7 @@ const viajeRoutes         = require('./routes/viajes');
 const horarioRoutes       = require('./routes/horarios');
 const geocodeRoutes       = require('./routes/geocode');
 const resenasRoutes       = require('./routes/resenas');
-const notificacionRoutes  = require('./routes/notificaciones'); // ← NUEVO
+const notificacionRoutes  = require('./routes/notificaciones');
 
 const app = express();
 
@@ -30,7 +31,7 @@ app.use('/api/viajes',          viajeRoutes);
 app.use('/api/horarios',        horarioRoutes);
 app.use('/api/geocode',         geocodeRoutes);
 app.use('/api/resenas',         resenasRoutes);
-app.use('/api/notificaciones',  notificacionRoutes); // ← NUEVO
+app.use('/api/notificaciones',  notificacionRoutes);
 
 app.use(errorHandler);
 
@@ -120,7 +121,6 @@ async function initDB() {
     );
   `);
 
-  // ─── TABLA DE NOTIFICACIONES (NUEVA) ───────────────────────────────────────
   await config.pool.query(`
     CREATE TABLE IF NOT EXISTS notificaciones (
       id           SERIAL PRIMARY KEY,
@@ -135,7 +135,6 @@ async function initDB() {
   `);
   await config.pool.query(`CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario ON notificaciones(usuario_id)`);
   await config.pool.query(`CREATE INDEX IF NOT EXISTS idx_notificaciones_leida   ON notificaciones(usuario_id, leida)`);
-  // ───────────────────────────────────────────────────────────────────────────
 
   await config.pool.query(`CREATE INDEX IF NOT EXISTS idx_resenas_receptor ON resenas(receptor_id)`);
   await config.pool.query(`CREATE INDEX IF NOT EXISTS idx_resenas_autor    ON resenas(autor_id)`);
@@ -144,17 +143,17 @@ async function initDB() {
   await config.pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitudes_pasajero  ON solicitudes(pasajero_id)`);
   await config.pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitudes_conductor ON solicitudes(conductor_id)`);
 
-  console.log('Base de datos verificada/creada');
+  console.log('✅ Base de datos verificada/creada');
 }
 
 async function startServer() {
   try {
     await initDB();
     app.listen(config.PORT, '0.0.0.0', () => {
-      console.log('Servidor corriendo en http://localhost:' + config.PORT);
+      console.log(`🚀 Servidor corriendo en http://localhost:${config.PORT}`);
     });
   } catch (err) {
-    console.error('Error al iniciar:', err.message);
+    console.error('❌ Error al iniciar:', err.message);
     process.exit(1);
   }
 }

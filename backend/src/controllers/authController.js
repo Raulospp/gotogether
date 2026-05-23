@@ -1,11 +1,15 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const pool = require('../../db/db');
-const config = require('../../src/config');
+const { pool } = require('../config');        // ✅ Corregido
+const config = require('../config');           // ✅ Corregido (está en la misma carpeta)
 const { sendVerificationEmail } = require('../services/emailService');
 
 // Helper para obtener URL base (para verificación)
 function getBaseUrl(req) {
+  // Si estás en producción con Render, usa la URL fija
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://gotogether-api.onrender.com';
+  }
   return `${req.protocol}://${req.get('host')}`;
 }
 

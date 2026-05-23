@@ -119,14 +119,12 @@ exports.responderSolicitud = async (req, res, next) => {
       return res.json({ message: 'Solicitud rechazada y eliminada' });
     }
 
-    // ACEPTAR — guardar precio_viaje si existe, con fallback seguro
     try {
       await pool.query(
         `UPDATE solicitudes SET estado = $1, precio_viaje = $2 WHERE id = $3`,
         [estado, precio_viaje || null, solicitudId]
       );
     } catch(e) {
-      // Si precio_viaje no existe todavia en la BD, actualizar sin el
       await pool.query('UPDATE solicitudes SET estado = $1 WHERE id = $2', [estado, solicitudId]);
     }
 

@@ -167,13 +167,10 @@ exports.getViajeById = async (req, res, next) => {
     const userRole    = req.user.role;
 
     if (userRole === 'conductor') {
-      // Para el conductor, ignorar el :id y devolver su viaje activo
       const viaje = await getViajesConductor(userId);
       if (!viaje) return res.status(404).json({ message: 'Viaje no encontrado' });
       return res.json(viaje);
     } else {
-      // Pasajero: buscar por solicitud_id exacto
-      // Si no encuentra, buscar la solicitud activa del día (el id puede estar desactualizado)
       let result = await pool.query(`
         SELECT s.id as solicitud_id, s.estado, s.fecha_viaje,
                s.pickup_lat, s.pickup_lon, s.pickup_direccion,
@@ -191,7 +188,6 @@ exports.getViajeById = async (req, res, next) => {
         WHERE s.id = $1::integer AND s.pasajero_id = $2::integer
       `, [solicitudId, userId]);
 
-      // Si no encontró por id exacto, buscar la solicitud activa del pasajero hoy
       if (result.rows.length === 0) {
         result = await pool.query(`
           SELECT s.id as solicitud_id, s.estado, s.fecha_viaje,
@@ -251,8 +247,6 @@ exports.limpiarViajesPasados = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /api/viajes/conductor/:conductorId — pickups del viaje activo de un conductor
-// Usado por el pasajero para ver el mapa completo del conductor
 exports.getPickupsConductor = async (req, res, next) => {
   try {
     const conductorId = req.params.conductorId;
