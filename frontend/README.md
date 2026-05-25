@@ -1,6 +1,6 @@
 <div align="center">
 
-# GoTogether — Frontend
+# Frontend
 
 ### Interfaz móvil de la plataforma de carpooling universitario
 
